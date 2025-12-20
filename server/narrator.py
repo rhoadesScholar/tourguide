@@ -39,6 +39,7 @@ class Narrator:
         if self.provider == "local":
             try:
                 import ollama
+
                 # Test Ollama connection
                 ollama.list()
                 self.client = ollama
@@ -49,8 +50,12 @@ class Narrator:
                 self.enabled = False
                 return
             except Exception as e:
-                print(f"[NARRATOR] ERROR: Failed to connect to Ollama. Is it running? {e}")
-                print("[NARRATOR] Install from ollama.com and run: ollama pull llama3.2-vision")
+                print(
+                    f"[NARRATOR] ERROR: Failed to connect to Ollama. Is it running? {e}"
+                )
+                print(
+                    "[NARRATOR] Install from ollama.com and run: ollama pull llama3.2-vision"
+                )
                 self.enabled = False
                 return
         elif self.provider == "gemini":
@@ -95,19 +100,110 @@ class Narrator:
 
         # Narration state
         self.last_narration_time = 0
+        self.last_narrated_screenshot_ts = 0  # Track which screenshot we last narrated
         self.narration_history: List[Dict[str, Any]] = []
         self.max_history = 10
         self.last_state: Optional[Dict[str, Any]] = None
         self.generating_narration = False  # Track if generation is in progress
-        
-        # Initialize edge-tts for server-side TTS
+
+        # Initialize TTS engines
         self.tts_available = False
-        try:
-            import edge_tts
-            self.tts_available = True
-            print("[NARRATOR] TTS engine initialized (edge-tts)", flush=True)
-        except Exception as e:
-            print(f"[NARRATOR] TTS engine not available: {e}", flush=True)
+        self.tts_engine = None
+        self.use_chatterbox = os.getenv("USE_CHATTERBOX", "false").lower() == "true"
+        self.voice_reference = os.getenv("VOICE_REFERENCE_PATH", None)
+        self.voice_embedding = None  # Store cloned voice embedding
+
+        if self.use_chatterbox:
+            try:
+                from chatterbox import ChatterboxTTS
+                import torch
+
+                self.tts_engine = "chatterbox"
+
+                # Initialize ChatterboxTTS with proper arguments
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+                print(
+                    f"[NARRATOR] Initializing Chatterbox TTS on {device}...", flush=True
+                )
+                self.chatterbox = ChatterboxTTS.from_pretrained(device=device)
+
+                # Prepare voice conditionals (embedding) ONCE at startup if reference provided
+                if self.voice_reference:
+                    print(
+                        f"[NARRATOR] Preparing voice embedding from {self.voice_reference}...",
+                        flush=True,
+                    )
+
+                    # Convert m4a/other formats to WAV if needed
+                    voice_file = self.voice_reference
+                    if not voice_file.lower().endswith(".wav"):
+                        try:
+                            import subprocess
+                            import tempfile
+
+                            wav_temp = tempfile.NamedTemporaryFile(
+                                suffix=".wav", delete=False
+                            )
+                            wav_path = wav_temp.name
+                            wav_temp.close()
+
+                            # Use ffmpeg to convert to WAV (preserve original sample rate)
+                            # Chatterbox will resample internally to 16kHz and 24kHz
+                            subprocess.run(
+                                [
+                                    "ffmpeg",
+                                    "-i",
+                                    voice_file,
+                                    "-acodec",
+                                    "pcm_s16le",  # 16-bit PCM
+                                    wav_path,
+                                    "-y",
+                                ],
+                                check=True,
+                                capture_output=True,
+                            )
+                            voice_file = wav_path
+                            print(f"[NARRATOR] Converted to WAV: {wav_path}", flush=True)
+                        except Exception as conv_err:
+                            print(
+                                f"[NARRATOR] Warning: Could not convert audio format: {conv_err}",
+                                flush=True,
+                            )
+                            print(f"[NARRATOR] Will try original file...", flush=True)
+
+                    # Prepare voice embedding - this caches in self.chatterbox.conds
+                    self.chatterbox.prepare_conditionals(voice_file, exaggeration=0.7)
+                    print(
+                        f"[NARRATOR] TTS engine initialized (Chatterbox with cloned voice)",
+                        flush=True,
+                    )
+                else:
+                    print(
+                        "[NARRATOR] TTS engine initialized (Chatterbox - default voice)",
+                        flush=True,
+                    )
+
+                self.tts_available = True
+            except Exception as e:
+                print(
+                    f"[NARRATOR] Chatterbox TTS not available: {e}, falling back to edge-tts",
+                    flush=True,
+                )
+                self.use_chatterbox = False
+
+        if not self.use_chatterbox:
+            try:
+                import edge_tts
+
+                self.tts_engine = "edge-tts"
+                self.edge_voice = os.getenv("EDGE_VOICE", "en-GB-RyanNeural")
+                self.tts_available = True
+                print(
+                    f"[NARRATOR] TTS engine initialized (edge-tts with {self.edge_voice})",
+                    flush=True,
+                )
+            except Exception as e:
+                print(f"[NARRATOR] TTS engine not available: {e}", flush=True)
 
         # Thresholds for triggering narration
         self.min_narration_interval = 3.0  # seconds between narrations
@@ -117,8 +213,15 @@ class Narrator:
         self.zoom_threshold = 0.2  # 20% zoom change (lowered for easier triggering)
         self.idle_threshold = 10.0  # seconds - narrate if idle after movement
 
-    def should_narrate(self, current_state: Dict[str, Any]) -> bool:
-        """Determine if we should generate narration for this state."""
+    def should_narrate(
+        self, current_state: Dict[str, Any], screenshot_ts: float = 0
+    ) -> bool:
+        """Determine if we should generate narration for this state.
+
+        Args:
+            current_state: Current viewer state
+            screenshot_ts: Timestamp of the current screenshot (0 if no screenshot)
+        """
         if not self.enabled:
             return False
 
@@ -130,6 +233,10 @@ class Narrator:
 
         # Don't narrate too frequently
         if current_time - self.last_narration_time < self.min_narration_interval:
+            return False
+
+        # Only narrate if we have a NEW screenshot (not already narrated)
+        if screenshot_ts > 0 and screenshot_ts <= self.last_narrated_screenshot_ts:
             return False
 
         # First state always gets narration
@@ -171,34 +278,49 @@ class Narrator:
         return False
 
     def generate_narration(
-        self, state: Dict[str, Any], screenshot_b64: Optional[str] = None
+        self,
+        state: Dict[str, Any],
+        screenshot_b64: Optional[str] = None,
+        screenshot_ts: float = 0,
     ) -> Optional[str]:
-        """Generate AI narration based on current viewer state and optional screenshot."""
+        """Generate AI narration based on current viewer state and optional screenshot.
+
+        Args:
+            state: Current viewer state
+            screenshot_b64: Base64-encoded screenshot (optional)
+            screenshot_ts: Timestamp of the screenshot
+        """
         if not self.enabled:
             return None
 
         # Set flag to prevent concurrent generation
         self.generating_narration = True
-        
+
         try:
-            # Build context from state
-            context = self._build_context(state)
+            # TEMPORARY TEST: Skip AI generation, use test message
+            import random
+            number = random.randint(1, 100)
+            narration = f"This is a test to make sure audio is being generated properly. If it is working, this next number will be the next in a sequence: {number}."
+            
+            # # Build context from state
+            # context = self._build_context(state)
 
-            # Build prompt for AI
-            prompt = self._build_prompt(context, state, screenshot_b64)
+            # # Build prompt for AI
+            # prompt = self._build_prompt(context, state, screenshot_b64)
 
-            # Call the appropriate API
-            if self.provider == "gemini":
-                narration = self._call_gemini(prompt, screenshot_b64)
-            elif self.provider == "claude":
-                narration = self._call_claude(prompt, screenshot_b64)
-            elif self.provider == "local":
-                narration = self._call_local(prompt, screenshot_b64)
-            else:
-                return None
+            # # Call the appropriate API
+            # if self.provider == "gemini":
+            #     narration = self._call_gemini(prompt, screenshot_b64)
+            # elif self.provider == "claude":
+            #     narration = self._call_claude(prompt, screenshot_b64)
+            # elif self.provider == "local":
+            #     narration = self._call_local(prompt, screenshot_b64)
+            # else:
+            #     return None
 
             # Update state
             self.last_narration_time = time.time()
+            self.last_narrated_screenshot_ts = screenshot_ts
             self.last_state = state
             self._add_to_history(narration, state)
 
@@ -252,7 +374,7 @@ class Narrator:
             if self.narration_history
             else "No previous narrations."
         )
-        
+
         # Get visible layers information
         visible_layers = [
             l["name"] for l in state.get("layers", []) if l.get("visible", True)
@@ -283,9 +405,14 @@ Guidelines:
 """
 
         if screenshot_b64:
-            prompt = base_context + "\n\nDescribe what you see in the image.\n\nNarration:"
+            prompt = (
+                base_context + "\n\nDescribe what you see in the image.\n\nNarration:"
+            )
         else:
-            prompt = base_context + "\n\nBased on the current position and zoom level, narrate what the viewer might be seeing.\n\nNarration:"
+            prompt = (
+                base_context
+                + "\n\nBased on the current position and zoom level, narrate what the viewer might be seeing.\n\nNarration:"
+            )
 
         return prompt
 
@@ -301,12 +428,15 @@ Guidelines:
 
                 image_data = base64.b64decode(screenshot_b64)
                 image = PIL.Image.open(io.BytesIO(image_data))
-                
+
                 # Debug: Save image to verify what's being sent
                 debug_path = "/tmp/narrator_debug_image.jpg"
-                image.save(debug_path, 'JPEG')
-                print(f"[NARRATOR DEBUG] Saved image to {debug_path} - Size: {image.size}, Mode: {image.mode}", flush=True)
-                
+                image.save(debug_path, "JPEG")
+                print(
+                    f"[NARRATOR DEBUG] Saved image to {debug_path} - Size: {image.size}, Mode: {image.mode}",
+                    flush=True,
+                )
+
                 response = self.client.generate_content([prompt, image])
             else:
                 # Text only
@@ -367,34 +497,36 @@ Guidelines:
                 import tempfile
                 import io
                 import PIL.Image
-                
+
                 image_data = base64.b64decode(screenshot_b64)
                 image = PIL.Image.open(io.BytesIO(image_data))
-                
+
                 # Debug: Save and log image details
                 debug_path = "/tmp/narrator_debug_ollama.jpg"
-                image.save(debug_path, 'JPEG')
-                print(f"[NARRATOR DEBUG] Ollama image - Size: {image.size}, Mode: {image.mode}, Saved to: {debug_path}", flush=True)
-                
+                image.save(debug_path, "JPEG")
+                print(
+                    f"[NARRATOR DEBUG] Ollama image - Size: {image.size}, Mode: {image.mode}, Saved to: {debug_path}",
+                    flush=True,
+                )
+
                 # Create temporary file
-                with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
-                    image.save(tmp.name, 'JPEG')
+                with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+                    image.save(tmp.name, "JPEG")
                     tmp_path = tmp.name
-                
+
                 try:
                     # Call Ollama with vision
                     response = self.client.chat(
-                        model='gemma3:12b',
-                        messages=[{
-                            'role': 'user',
-                            'content': prompt,
-                            'images': [tmp_path]
-                        }]
+                        model="gemma3:12b",
+                        messages=[
+                            {"role": "user", "content": prompt, "images": [tmp_path]}
+                        ],
                     )
-                    return response['message']['content'].strip()
+                    return response["message"]["content"].strip()
                 finally:
                     # Clean up temp file
                     import os
+
                     try:
                         os.unlink(tmp_path)
                     except:
@@ -402,49 +534,114 @@ Guidelines:
             else:
                 # Text only
                 response = self.client.chat(
-                    model='gemma3:12b',
-                    messages=[{'role': 'user', 'content': prompt}]
+                    model="gemma3:12b", messages=[{"role": "user", "content": prompt}]
                 )
-                return response['message']['content'].strip()
+                return response["message"]["content"].strip()
         except Exception as e:
             print(f"[NARRATOR] Local (Ollama) error: {e}", flush=True)
             return None
 
     async def generate_audio_async(self, text: str) -> Optional[str]:
-        """Generate audio from text and return as base64-encoded MP3."""
+        """Generate audio from text and return as base64-encoded audio."""
         if not self.tts_available:
+            print(
+                f"[NARRATOR] TTS not available, skipping audio generation", flush=True
+            )
             return None
-        
+
         try:
-            import edge_tts
             import tempfile
             import base64
             import os
-            
-            # Create temporary file for MP3
-            with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as tmp:
-                tmp_path = tmp.name
-            
-            # Generate speech using edge-tts (British male voice, documentary style)
-            # en-GB-RyanNeural is a British male voice suitable for narration
-            communicate = edge_tts.Communicate(text, "en-GB-RyanNeural")
-            await communicate.save(tmp_path)
-            
-            # Read and encode the file
-            with open(tmp_path, 'rb') as f:
-                audio_data = f.read()
-            
-            # Clean up temp file
-            try:
-                os.unlink(tmp_path)
-            except:
-                pass
-            
-            # Return base64-encoded audio
-            return base64.b64encode(audio_data).decode('utf-8')
-            
+
+            if self.tts_engine == "chatterbox":
+                print(
+                    f"[NARRATOR] Generating audio with Chatterbox for: {text[:50]}...",
+                    flush=True,
+                )
+                # Use Chatterbox for TTS - voice embedding already cached from startup
+                # generate() returns torch tensor at 24000 Hz (S3GEN_SR)
+                audio_tensor = self.chatterbox.generate(text=text, exaggeration=0.7, cfg_weight=0.3)
+                print(
+                    f"[NARRATOR] Chatterbox generated audio tensor shape: {audio_tensor.shape}",
+                    flush=True,
+                )
+                print(f"[NARRATOR] Audio tensor type: {type(audio_tensor)}", flush=True)
+
+                # Convert torch tensor to numpy array
+                import numpy as np
+
+                audio_np = audio_tensor.squeeze().cpu().numpy()
+                print(
+                    f"[NARRATOR] Numpy audio shape: {audio_np.shape}, dtype: {audio_np.dtype}",
+                    flush=True,
+                )
+
+                # Convert to int16 for WAV file
+                audio_int16 = (audio_np * 32767).astype(np.int16)
+                print(
+                    f"[NARRATOR] Int16 audio shape: {audio_int16.shape}, dtype: {audio_int16.dtype}",
+                    flush=True,
+                )
+
+                # Save to temp WAV file
+                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                    tmp_path = tmp.name
+
+                import scipy.io.wavfile
+
+                scipy.io.wavfile.write(tmp_path, 24000, audio_int16)
+                print(f"[NARRATOR] Wrote WAV to: {tmp_path}", flush=True)
+
+                # Read and encode
+                with open(tmp_path, "rb") as f:
+                    audio_data = f.read()
+
+                print(
+                    f"[NARRATOR] Audio file size: {len(audio_data)} bytes", flush=True
+                )
+
+                try:
+                    os.unlink(tmp_path)
+                except:
+                    pass
+
+                encoded = base64.b64encode(audio_data).decode("utf-8")
+                print(
+                    f"[NARRATOR] Base64 encoded audio: {len(encoded)} chars", flush=True
+                )
+                return encoded
+
+            else:
+                # Use edge-tts
+                import edge_tts
+
+                # Create temporary file for MP3
+                with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
+                    tmp_path = tmp.name
+
+                # Generate speech using edge-tts
+                communicate = edge_tts.Communicate(text, self.edge_voice)
+                await communicate.save(tmp_path)
+
+                # Read and encode the file
+                with open(tmp_path, "rb") as f:
+                    audio_data = f.read()
+
+                # Clean up temp file
+                try:
+                    os.unlink(tmp_path)
+                except:
+                    pass
+
+                # Return base64-encoded audio
+                return base64.b64encode(audio_data).decode("utf-8")
+
         except Exception as e:
             print(f"[NARRATOR] Audio generation error: {e}", flush=True)
+            import traceback
+
+            traceback.print_exc()
             return None
 
     def _add_to_history(self, narration: str, state: Dict[str, Any]):

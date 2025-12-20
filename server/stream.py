@@ -349,28 +349,35 @@ def create_app(tracker) -> FastAPI:
                     # Update state in the frame
                     latest_frame["state"] = ng_tracker.current_state_summary
 
-                    # Check if we should generate narration
+                    # Check if we should generate narration (pass screenshot timestamp)
                     if ng_tracker.narrator.should_narrate(
-                        ng_tracker.current_state_summary
+                        ng_tracker.current_state_summary,
+                        screenshot_ts=latest_frame["timestamp"],
                     ):
                         print(f"[NARRATOR] Generating narration...", flush=True)
                         narration = ng_tracker.narrator.generate_narration(
                             ng_tracker.current_state_summary,
                             screenshot_b64=latest_frame["jpeg_b64"],
+                            screenshot_ts=latest_frame["timestamp"],
                         )
                         if narration:
                             # Generate audio (async)
-                            audio_data = await ng_tracker.narrator.generate_audio_async(narration)
-                            
+                            audio_data = await ng_tracker.narrator.generate_audio_async(
+                                narration
+                            )
+
                             # Send narration message
                             narration_msg = {
                                 "type": "narration",
                                 "text": narration,
                                 "timestamp": time.time(),
-                                "audio": audio_data,  # base64 MP3 or None
+                                "audio": audio_data,  # base64 MP3 or WAV or None
                             }
                             await websocket.send_json(narration_msg)
-                            print(f"[NARRATOR] Sent: {narration}", flush=True)
+                            print(
+                                f"[NARRATOR] Sent narration with audio: {len(audio_data) if audio_data else 0} bytes",
+                                flush=True,
+                            )
 
                     # Only send if this is a new frame
                     if (

@@ -111,13 +111,8 @@ class NG_StateTracker:
                 self.state_dirty = True
                 self.screenshot_dirty = True  # Trigger screenshot on meaningful change
 
-                # Stage 4: Generate AI narration if conditions are met
-                if self.narrator.should_narrate(summary):
-                    narration = self.narrator.generate_narration(summary)
-                    if narration and self.narrator_callback:
-                        self.narrator_callback(narration)
-                    elif narration:
-                        print(f"[NARRATION] {narration}")
+                # Narration is handled in stream.py with screenshots
+                # This callback just marks state as dirty
         except Exception as e:
             print(f"Error in state change callback: {e}")
 

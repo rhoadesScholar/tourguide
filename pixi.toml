@@ -7,7 +7,7 @@ channels = ["conda-forge"]
 platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
 
 [dependencies]
-python = ">=3.10"
+python = "3.11.*"
 fastapi = "*"
 uvicorn = "*"
 pillow = ">=12.0.0,<13"
@@ -15,6 +15,7 @@ websockets = "*"
 pip = "*"
 google-generativeai = ">=0.8.6,<0.9"
 python-dotenv = "*"
+ffmpeg = "*"
 
 [pypi-dependencies]
 neuroglancer = "*"
@@ -23,6 +24,7 @@ ollama = "*"
 edge-tts = "*"
 
 [tasks]
+install-chatterbox = { cmd = "pip install 'numpy>=1.24.0,<1.26.0' && pip install chatterbox-tts" }
 start = { cmd = "pkill -9 -f 'python.*main.py' 2>/dev/null || true && python server/main.py" }
 dev = { cmd = "pkill -9 -f 'python.*main.py' 2>/dev/null || true && python server/main.py --fps 3" }
 

@@ -10,6 +10,9 @@ class NGLiveStream {
         this.frameTimestamps = [];
         this.narrations = [];  // Keep history of narrations
         this.maxNarrations = 10;  // Maximum narrations to display
+        this.audioEnabled = false;  // Track if user has enabled audio
+        this.audioQueue = [];  // Queue audio until enabled
+        this.isPlayingAudio = false;  // Track if audio is currently playing
 
         // Screenshot capture settings
         this.screenshotInterval = null;
@@ -30,6 +33,32 @@ class NGLiveStream {
         this.fpsEl = document.getElementById('fps');
         this.narrationContainer = document.getElementById('narration-container');
         this.screenshotFpsInput = document.getElementById('screenshot-fps');
+        this.enableAudioBtn = document.getElementById('enable-audio-btn');
+
+        // Enable audio on ANY user interaction
+        const enableAudioOnInteraction = () => {
+            if (!this.audioEnabled) {
+                this.audioEnabled = true;
+                if (this.enableAudioBtn) {
+                    this.enableAudioBtn.style.display = 'none';
+                }
+                console.log('[AUDIO] Audio enabled by user interaction');
+                // Play any queued audio
+                if (this.audioQueue.length > 0 && !this.isPlayingAudio) {
+                    this.playNextAudio();
+                }
+            }
+        };
+
+        // Listen for any interaction
+        ['click', 'keydown', 'touchstart'].forEach(event => {
+            document.addEventListener(event, enableAudioOnInteraction, { once: true });
+        });
+
+        // Setup audio enable button as backup
+        if (this.enableAudioBtn) {
+            this.enableAudioBtn.addEventListener('click', enableAudioOnInteraction);
+        }
 
         // Setup screenshot FPS control
         if (this.screenshotFpsInput) {
@@ -372,6 +401,10 @@ class NGLiveStream {
 
     handleNarration(data) {
         console.log('Narration received:', data.text);
+        console.log('Audio data present:', !!data.audio);
+        if (data.audio) {
+            console.log('Audio data length:', data.audio.length);
+        }
 
         // Add to narrations list (most recent first)
         this.narrations.unshift({
@@ -389,7 +422,10 @@ class NGLiveStream {
         
         // Queue audio if available
         if (data.audio) {
+            console.log('Queueing audio for playback');
             this.queueAudio(data.audio);
+        } else {
+            console.warn('No audio data in narration message');
         }
     }
     
@@ -403,9 +439,15 @@ class NGLiveStream {
         // Add to queue
         this.audioQueue.push(base64Audio);
         
-        // Start playing if not already playing
-        if (!this.isPlayingAudio) {
+        // Start playing if not already playing and audio is enabled
+        if (!this.isPlayingAudio && this.audioEnabled) {
             this.playNextAudio();
+        } else if (!this.audioEnabled) {
+            console.log('[AUDIO] Audio queued, waiting for user to enable audio');
+            // Show the enable audio button if it's hidden
+            if (this.enableAudioBtn) {
+                this.enableAudioBtn.style.display = 'block';
+            }
         }
     }
     
@@ -430,8 +472,17 @@ class NGLiveStream {
                 bytes[i] = binaryString.charCodeAt(i);
             }
             
-            // Create blob and URL (MP3 format from edge-tts)
-            const blob = new Blob([bytes], { type: 'audio/mpeg' });
+            // Auto-detect audio format by checking file signature
+            // WAV: starts with "RIFF", MP3: starts with "ID3" or 0xFF
+            let mimeType = 'audio/mpeg'; // default to MP3
+            if (bytes.length >= 4) {
+                if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
+                    mimeType = 'audio/wav'; // RIFF header = WAV
+                }
+            }
+            
+            // Create blob and URL
+            const blob = new Blob([bytes], { type: mimeType });
             const audioUrl = URL.createObjectURL(blob);
             
             // Play audio

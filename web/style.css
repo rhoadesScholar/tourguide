@@ -175,6 +175,28 @@ main {
     padding: 20px;
 }
 
+.enable-audio-btn {
+    width: 100%;
+    padding: 12px 20px;
+    margin-bottom: 15px;
+    background: #4a9eff;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.enable-audio-btn:hover {
+    background: #3a8eef;
+}
+
+.enable-audio-btn:active {
+    background: #2a7edf;
+}
+
 .narration-container {
     max-height: 400px;
     overflow-y: auto;

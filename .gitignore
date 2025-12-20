@@ -37,6 +37,11 @@ pixi.lock
 .pytest_cache/
 .coverage
 htmlcov/
+test_chatterbox.py
+test_output.wav
+
+# Voice recording files
+voice_recording/
 
 # Claude artifacts
 .claude/
