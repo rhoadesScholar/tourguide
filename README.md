@@ -13,6 +13,7 @@ A fully standalone static site version is now available in the [`static-site/`](
 
 🌐 **[Live Demo on GitHub Pages →](https://rhoadesscholar.github.io/tourguide/)**  
 👉 **[Get Started with Static Site →](static-site/README.md)**  
+⚙️ **[GitHub Pages Setup Guide →](static-site/GITHUB_PAGES.md)**  
 📊 **[Compare Features: Static vs Backend →](COMPARISON.md)**  
 🚀 **[Deployment Guide →](static-site/DEPLOYMENT.md)**
 
