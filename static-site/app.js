@@ -8,6 +8,38 @@
  * - Public CSV files for organelle data
  */
 
+// Configuration Constants
+const CONFIG = {
+    datasets: {
+        celegans: {
+            name: 'C. elegans (Comma Stage)',
+            baseUrl: 'zarr://https://cellmap-vm1.int.janelia.org/nrs/data/jrc_c-elegans-op50-1/jrc_c-elegans-op50-1.zarr/recon-1',
+            dimensions: {
+                x: [8e-9, 'm'],
+                y: [8e-9, 'm'],
+                z: [8e-9, 'm']
+            },
+            initialPosition: [5000, 5000, 5000],
+            organelles: ['mito', 'nuc', 'er']
+        },
+        hela: {
+            name: 'HeLa Cell',
+            baseUrl: 's3://janelia-cosem-datasets/jrc_hela-2/jrc_hela-2',
+            dimensions: {
+                x: [4e-9, 'm'],
+                y: [4e-9, 'm'],
+                z: [4e-9, 'm']
+            },
+            initialPosition: [5000, 5000, 2500],
+            organelles: ['mito_seg', 'nucleus_seg', 'er_seg']
+        }
+    },
+    security: {
+        storageKey: 'ng-tourguide-api-config',
+        storageWarning: '⚠️ API keys are stored in browser localStorage. Do not use this on shared computers. Keys are only sent to their respective API providers.'
+    }
+};
+
 class NeuroglancerTourguide {
     constructor() {
         this.viewer = null;
@@ -75,15 +107,12 @@ class NeuroglancerTourguide {
 
     getCelegansState() {
         // C. elegans comma stage embryo EM data
-        const baseUrl = 'zarr://https://cellmap-vm1.int.janelia.org/nrs/data/jrc_c-elegans-op50-1/jrc_c-elegans-op50-1.zarr/recon-1';
+        const config = CONFIG.datasets.celegans;
+        const baseUrl = config.baseUrl;
         
         return {
-            dimensions: {
-                x: [8e-9, 'm'],
-                y: [8e-9, 'm'],
-                z: [8e-9, 'm']
-            },
-            position: [5000, 5000, 5000],
+            dimensions: config.dimensions,
+            position: config.initialPosition,
             crossSectionScale: 10,
             projectionScale: 100000,
             layers: [
@@ -118,15 +147,12 @@ class NeuroglancerTourguide {
 
     getHelaState() {
         // HeLa-2 cell EM data from public S3 bucket
-        const baseUrl = 's3://janelia-cosem-datasets/jrc_hela-2/jrc_hela-2';
+        const config = CONFIG.datasets.hela;
+        const baseUrl = config.baseUrl;
         
         return {
-            dimensions: {
-                x: [4e-9, 'm'],
-                y: [4e-9, 'm'],
-                z: [4e-9, 'm']
-            },
-            position: [5000, 5000, 2500],
+            dimensions: config.dimensions,
+            position: config.initialPosition,
             crossSectionScale: 10,
             projectionScale: 50000,
             layers: [
@@ -479,11 +505,18 @@ class NeuroglancerTourguide {
             // Use Neuroglancer's screenshot capability
             const canvas = document.querySelector('#neuroglancer-container canvas');
             if (!canvas) {
-                throw new Error('Canvas not found');
+                throw new Error('Canvas not found - Neuroglancer may not be fully loaded');
             }
             
             // Convert canvas to data URL
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            // This may fail if canvas contains cross-origin content
+            let dataUrl;
+            try {
+                dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            } catch (corsError) {
+                console.error('CORS error capturing screenshot:', corsError);
+                throw new Error('Screenshot capture blocked by CORS policy. This can happen if external data sources taint the canvas.');
+            }
             
             // Add to screenshots
             const screenshot = {
@@ -505,7 +538,7 @@ class NeuroglancerTourguide {
             console.log('✅ Screenshot captured');
         } catch (error) {
             console.error('❌ Screenshot capture failed:', error);
-            alert('Failed to capture screenshot: ' + error.message);
+            alert('Failed to capture screenshot: ' + error.message + '\n\nNote: Screenshot capture requires the canvas to not be tainted by cross-origin content.');
         }
     }
 

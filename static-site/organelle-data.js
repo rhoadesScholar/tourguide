@@ -77,8 +77,9 @@ class OrganelleDataManager {
             
             header.forEach((key, index) => {
                 const value = values[index];
-                // Try to parse as number, otherwise keep as string
-                row[key] = isNaN(value) ? value : parseFloat(value);
+                // Parse as number if valid, otherwise keep as string
+                const numValue = Number(value);
+                row[key] = (value !== '' && !Number.isNaN(numValue)) ? numValue : value;
             });
             
             data.push(row);

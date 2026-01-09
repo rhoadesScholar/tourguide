@@ -149,7 +149,21 @@ header h1 {
 
 .modal-description {
     color: var(--text-secondary);
+    margin-bottom: 1rem;
+}
+
+.security-warning {
+    background-color: rgba(255, 152, 0, 0.1);
+    border: 1px solid var(--warning);
+    border-radius: 4px;
+    padding: 1rem;
     margin-bottom: 1.5rem;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.security-warning strong {
+    color: var(--warning);
 }
 
 .api-provider-tabs {
