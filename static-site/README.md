@@ -231,6 +231,29 @@ To modify or extend the static site:
 2. **CSS**: Edit `style.css` for styling
 3. **JavaScript**: Edit `app.js` for functionality
 
+### Testing
+
+The static site includes comprehensive tests:
+
+```bash
+cd static-site
+npm install
+
+# Run unit tests
+npm test
+
+# Run E2E tests
+npm run test:e2e
+
+# Run linting
+npm run lint
+
+# Run all tests
+npm run test:all
+```
+
+See [TESTING.md](TESTING.md) for detailed testing documentation.
+
 ### Key Classes
 
 - `NeuroglancerTourguide`: Main application class

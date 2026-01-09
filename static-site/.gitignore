@@ -38,3 +38,16 @@ temp/
 *.zip
 *.tar.gz
 *.rar
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Playwright
+playwright-report/
+test-results/
+playwright/.cache/
+
+# Package lock files (keep package.json only)
+package-lock.json
+yarn.lock
