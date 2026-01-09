@@ -48,6 +48,5 @@ playwright-report/
 test-results/
 playwright/.cache/
 
-# Package lock files (keep package.json only)
-package-lock.json
+# Yarn lock files (keep package.json and package-lock.json)
 yarn.lock
