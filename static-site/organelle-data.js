@@ -58,7 +58,7 @@ class OrganelleDataManager {
     }
 
     /**
-     * Simple CSV parser (for basic CSV format)
+     * Simple CSV parser with proper quote handling
      */
     parseCSV(csvText) {
         const lines = csvText.trim().split('\n');
@@ -66,17 +66,51 @@ class OrganelleDataManager {
             return [];
         }
 
+        // Helper function to parse a CSV line with quote handling
+        const parseLine = (line) => {
+            const values = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                const nextChar = line[i + 1];
+                
+                if (char === '"') {
+                    if (inQuotes && nextChar === '"') {
+                        // Escaped quote
+                        current += '"';
+                        i++; // Skip next quote
+                    } else {
+                        // Toggle quote state
+                        inQuotes = !inQuotes;
+                    }
+                } else if (char === ',' && !inQuotes) {
+                    // End of field
+                    values.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            
+            // Add last field
+            values.push(current.trim());
+            
+            return values;
+        };
+
         // Parse header
-        const header = lines[0].split(',').map(h => h.trim());
+        const header = parseLine(lines[0]);
         
         // Parse rows
         const data = [];
         for (let i = 1; i < lines.length; i++) {
-            const values = lines[i].split(',').map(v => v.trim());
+            const values = parseLine(lines[i]);
             const row = {};
             
             header.forEach((key, index) => {
-                const value = values[index];
+                const value = values[index] || '';
                 // Parse as number if valid, otherwise keep as string
                 const numValue = Number(value);
                 row[key] = (value !== '' && !Number.isNaN(numValue)) ? numValue : value;

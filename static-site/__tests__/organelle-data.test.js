@@ -49,6 +49,31 @@ describe('OrganelleDataManager', () => {
       });
     });
 
+    test('should handle CSV values with commas in quotes', () => {
+      const csvText = `id,name,description
+1,"Smith, John","A person with a comma in name"
+2,"Doe, Jane","Another person"`;
+
+      const result = manager.parseCSV(csvText);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].name).toBe('Smith, John');
+      expect(result[0].description).toBe('A person with a comma in name');
+      expect(result[1].name).toBe('Doe, Jane');
+    });
+
+    test('should handle escaped quotes in CSV', () => {
+      const csvText = `id,name,quote
+1,Test,"He said ""Hello"""
+2,Another,"She replied ""Hi"""`;
+
+      const result = manager.parseCSV(csvText);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].quote).toBe('He said "Hello"');
+      expect(result[1].quote).toBe('She replied "Hi"');
+    });
+
     test('should handle empty strings correctly', () => {
       const csvText = `id,name,value
 1,test,100
