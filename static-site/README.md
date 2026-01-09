@@ -51,18 +51,33 @@ Click the **⚙️ API Settings** button in the header and add your API key:
 - **OpenAI GPT**: Get from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
 - **Google Gemini**: Get from [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
 
-API keys are stored locally in your browser (localStorage) and never sent to any third party except the AI provider you configure.
+**Authentication Method**: This application uses **direct API authentication** where you provide your own API keys from the AI service providers. Your keys are stored locally in your browser (localStorage) and are only sent directly to the AI provider you configure (Anthropic, OpenAI, or Google). No intermediate authentication portal is used - you authenticate directly with each supplier's portal to obtain your keys.
+
+**Security**: API keys never leave your computer except when making requests to the AI provider you've configured. They are not sent to any other servers.
 
 ## Deployment
 
 This static site can be deployed to any static hosting service:
 
-### GitHub Pages
+### GitHub Pages (Automatic Deployment)
 
-1. Push the `static-site` folder to your repository
-2. Enable GitHub Pages in repository settings
-3. Select the branch and `/static-site` folder
-4. Access at `https://yourusername.github.io/yourrepo/`
+This repository includes a GitHub Actions workflow that automatically deploys the static site to GitHub Pages when changes are pushed to the main branch.
+
+**Setup (One-time):**
+
+1. Go to your repository **Settings** → **Pages**
+2. Under **Source**, select **GitHub Actions**
+3. The workflow will automatically deploy on push to main
+
+**Accessing the site:**
+- URL: `https://rhoadesscholar.github.io/tourguide/`
+- Updates automatically when you push changes to `static-site/` in the main branch
+
+**Manual deployment:**
+You can also trigger deployment manually:
+1. Go to **Actions** tab
+2. Select "Deploy Static Site to GitHub Pages"
+3. Click "Run workflow"
 
 ### Netlify
 
@@ -178,6 +193,22 @@ For query features that need organelle metadata, you can configure public CSV fi
 - **No Tracking**: No analytics or tracking scripts
 - **HTTPS Required**: For API calls to work, serve over HTTPS in production
 - **CORS**: All data sources have CORS enabled for browser access
+
+### API Authentication Model
+
+This application uses **direct supplier authentication** - you obtain API keys directly from each AI service provider's portal:
+
+1. **Anthropic Claude**: Visit [console.anthropic.com](https://console.anthropic.com/) and create an API key
+2. **OpenAI GPT**: Visit [platform.openai.com/api-keys](https://platform.openai.com/api-keys) and create an API key  
+3. **Google Gemini**: Visit [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) and create an API key
+
+**No intermediate authentication portal is used.** Your API keys are:
+- ✅ Stored only in your browser's localStorage
+- ✅ Never sent to any server except the AI provider you configured
+- ✅ Under your complete control (you can clear them anytime)
+- ✅ Managed directly through each supplier's authentication portal
+
+This approach ensures maximum security and privacy, as your credentials never pass through any intermediate service.
 
 ## Limitations
 

@@ -11,6 +11,7 @@ A fully standalone static site version is now available in the [`static-site/`](
 - ✅ **Public CORS data** - Uses Janelia CellMap S3 Zarr datasets
 - ✅ **Neuroglancer JS** - Standalone JavaScript library
 
+🌐 **[Live Demo on GitHub Pages →](https://rhoadesscholar.github.io/tourguide/)**  
 👉 **[Get Started with Static Site →](static-site/README.md)**  
 📊 **[Compare Features: Static vs Backend →](COMPARISON.md)**  
 🚀 **[Deployment Guide →](static-site/DEPLOYMENT.md)**
