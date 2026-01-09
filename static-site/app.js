@@ -40,17 +40,13 @@ class NeuroglancerTourguide {
         
         const container = document.getElementById('neuroglancer-container');
         
-        // Create Neuroglancer viewer with default state
-        this.viewer = new neuroglancer.Viewer(container, {
-            showLayerDialog: true,
-            showLayerPanel: true,
-            showHelpButton: true,
-        });
+        // Create Neuroglancer viewer
+        this.viewer = new neuroglancer.Viewer(container);
         
-        // Load initial dataset
+        // Load initial dataset by setting state
         this.loadDataset(this.currentDataset);
         
-        // Setup state change listener
+        // Setup state change listener using Neuroglancer's state management
         this.viewer.state.changed.add(() => {
             this.onViewerStateChanged();
         });
@@ -63,80 +59,104 @@ class NeuroglancerTourguide {
         
         this.currentDataset = datasetName;
         
-        // Clear existing layers
-        this.viewer.layerManager.clear();
-        
+        // Build state object based on dataset
+        let state;
         if (datasetName === 'celegans') {
-            this.loadCelegansDataset();
+            state = this.getCelegansState();
         } else if (datasetName === 'hela') {
-            this.loadHelaDataset();
+            state = this.getHelaState();
         }
+        
+        // Set the viewer state
+        this.viewer.state.restoreState(state);
         
         console.log(`✅ Dataset loaded: ${datasetName}`);
     }
 
-    loadCelegansDataset() {
+    getCelegansState() {
         // C. elegans comma stage embryo EM data
-        // Using public CORS-compatible Janelia CellMap data
         const baseUrl = 'zarr://https://cellmap-vm1.int.janelia.org/nrs/data/jrc_c-elegans-op50-1/jrc_c-elegans-op50-1.zarr/recon-1';
         
-        // Add EM layer
-        this.viewer.layerManager.addManagedLayer(
-            this.viewer.layerSpecification.getLayer('fibsem-int16', {
-                type: 'image',
-                source: `${baseUrl}/em/fibsem-int16/`,
-                shader: '#uicontrol invlerp normalized\nvoid main() { emitGrayscale(normalized()); }'
-            })
-        );
-        
-        // Add organelle segmentation layers
-        const segBase = `${baseUrl}/labels/inference/segmentations`;
-        const organelles = ['cell', 'ld', 'lyso', 'mito', 'nuc', 'perox', 'yolk'];
-        
-        organelles.forEach(organelle => {
-            this.viewer.layerManager.addManagedLayer(
-                this.viewer.layerSpecification.getLayer(organelle, {
+        return {
+            dimensions: {
+                x: [8e-9, 'm'],
+                y: [8e-9, 'm'],
+                z: [8e-9, 'm']
+            },
+            position: [5000, 5000, 5000],
+            crossSectionScale: 10,
+            projectionScale: 100000,
+            layers: [
+                {
+                    type: 'image',
+                    source: `${baseUrl}/em/fibsem-int16/`,
+                    name: 'fibsem-int16',
+                    shader: '#uicontrol invlerp normalized\nvoid main() { emitGrayscale(normalized()); }'
+                },
+                {
                     type: 'segmentation',
-                    source: `${segBase}/${organelle}/`,
+                    source: `${baseUrl}/labels/inference/segmentations/mito/`,
+                    name: 'mito',
                     visible: false
-                })
-            );
-        });
-        
-        // Set initial position (center of dataset)
-        this.viewer.navigationState.position.value = [5000, 5000, 5000];
-        this.viewer.navigationState.zoomFactor.value = 10;
+                },
+                {
+                    type: 'segmentation',
+                    source: `${baseUrl}/labels/inference/segmentations/nuc/`,
+                    name: 'nuc',
+                    visible: false
+                },
+                {
+                    type: 'segmentation',
+                    source: `${baseUrl}/labels/inference/segmentations/er/`,
+                    name: 'er',
+                    visible: false
+                }
+            ],
+            layout: 'xy-3d'
+        };
     }
 
-    loadHelaDataset() {
+    getHelaState() {
         // HeLa-2 cell EM data from public S3 bucket
         const baseUrl = 's3://janelia-cosem-datasets/jrc_hela-2/jrc_hela-2';
         
-        // Add EM layer
-        this.viewer.layerManager.addManagedLayer(
-            this.viewer.layerSpecification.getLayer('fibsem-uint8', {
-                type: 'image',
-                source: `zarr://${baseUrl}.zarr/recon-1/em/fibsem-uint8/`,
-                shader: '#uicontrol invlerp normalized\nvoid main() { emitGrayscale(normalized()); }'
-            })
-        );
-        
-        // Add organelle segmentation layers (N5 format)
-        const organelles = ['endo_seg', 'er_seg', 'golgi_seg', 'mito_seg', 'nucleus_seg', 'pm_seg', 'vesicle_seg'];
-        
-        organelles.forEach(organelle => {
-            this.viewer.layerManager.addManagedLayer(
-                this.viewer.layerSpecification.getLayer(organelle, {
+        return {
+            dimensions: {
+                x: [4e-9, 'm'],
+                y: [4e-9, 'm'],
+                z: [4e-9, 'm']
+            },
+            position: [5000, 5000, 2500],
+            crossSectionScale: 10,
+            projectionScale: 50000,
+            layers: [
+                {
+                    type: 'image',
+                    source: `zarr://${baseUrl}.zarr/recon-1/em/fibsem-uint8/`,
+                    name: 'fibsem-uint8',
+                    shader: '#uicontrol invlerp normalized\nvoid main() { emitGrayscale(normalized()); }'
+                },
+                {
                     type: 'segmentation',
-                    source: `n5://${baseUrl}.n5/labels/${organelle}`,
+                    source: `n5://${baseUrl}.n5/labels/mito_seg`,
+                    name: 'mito_seg',
                     visible: false
-                })
-            );
-        });
-        
-        // Set initial position for HeLa dataset
-        this.viewer.navigationState.position.value = [5000, 5000, 2500];
-        this.viewer.navigationState.zoomFactor.value = 10;
+                },
+                {
+                    type: 'segmentation',
+                    source: `n5://${baseUrl}.n5/labels/nucleus_seg`,
+                    name: 'nucleus_seg',
+                    visible: false
+                },
+                {
+                    type: 'segmentation',
+                    source: `n5://${baseUrl}.n5/labels/er_seg`,
+                    name: 'er_seg',
+                    visible: false
+                }
+            ],
+            layout: 'xy-3d'
+        };
     }
 
     onViewerStateChanged() {
@@ -147,35 +167,42 @@ class NeuroglancerTourguide {
     updateStateDisplay() {
         const stateInfo = document.getElementById('state-info');
         
-        // Get current state
-        const position = this.viewer.navigationState.position.value;
-        const zoom = this.viewer.navigationState.zoomFactor.value;
-        const layers = [];
+        if (!this.viewer || !this.viewer.state) {
+            stateInfo.innerHTML = '<p>Loading viewer...</p>';
+            return;
+        }
         
-        this.viewer.layerManager.managedLayers.forEach(layer => {
-            layers.push({
-                name: layer.name,
-                visible: layer.visible
-            });
-        });
-        
-        // Update display
-        stateInfo.innerHTML = `
-            <div class="state-section">
-                <h3>Position</h3>
-                <p>X: ${position[0].toFixed(0)}, Y: ${position[1].toFixed(0)}, Z: ${position[2].toFixed(0)}</p>
-            </div>
-            <div class="state-section">
-                <h3>Zoom</h3>
-                <p>${zoom.toFixed(2)}x</p>
-            </div>
-            <div class="state-section">
-                <h3>Layers (${layers.length})</h3>
-                <ul>
-                    ${layers.map(l => `<li>${l.name} ${l.visible ? '✓' : '✗'}</li>`).join('')}
-                </ul>
-            </div>
-        `;
+        try {
+            // Get current viewer state
+            const state = this.viewer.state.toJSON();
+            const position = state.position || [0, 0, 0];
+            const scale = state.crossSectionScale || 1;
+            const layers = state.layers || [];
+            
+            // Update display
+            stateInfo.innerHTML = `
+                <div class="state-section">
+                    <h3>Position</h3>
+                    <p>X: ${position[0].toFixed(0)}, Y: ${position[1].toFixed(0)}, Z: ${position[2].toFixed(0)}</p>
+                </div>
+                <div class="state-section">
+                    <h3>Scale</h3>
+                    <p>${scale.toFixed(2)}x</p>
+                </div>
+                <div class="state-section">
+                    <h3>Layers (${layers.length})</h3>
+                    <ul>
+                        ${layers.map(l => {
+                            const visible = l.visible !== false;
+                            return `<li>${l.name || 'unnamed'} ${visible ? '✓' : '✗'}</li>`;
+                        }).join('')}
+                    </ul>
+                </div>
+            `;
+        } catch (error) {
+            console.error('Error updating state display:', error);
+            stateInfo.innerHTML = '<p>Error reading state</p>';
+        }
     }
 
     setupEventListeners() {
@@ -483,14 +510,24 @@ class NeuroglancerTourguide {
     }
 
     getCurrentState() {
-        const position = this.viewer.navigationState.position.value;
-        const zoom = this.viewer.navigationState.zoomFactor.value;
-        
-        return {
-            position: [position[0], position[1], position[2]],
-            zoom,
-            dataset: this.currentDataset
-        };
+        try {
+            const state = this.viewer.state.toJSON();
+            const position = state.position || [0, 0, 0];
+            const scale = state.crossSectionScale || 1;
+            
+            return {
+                position: [position[0], position[1], position[2]],
+                scale,
+                dataset: this.currentDataset
+            };
+        } catch (error) {
+            console.error('Error getting current state:', error);
+            return {
+                position: [0, 0, 0],
+                scale: 1,
+                dataset: this.currentDataset
+            };
+        }
     }
 
     displayScreenshot(screenshot) {
@@ -510,7 +547,7 @@ class NeuroglancerTourguide {
             <div class="screenshot-info">
                 <p><strong>Time:</strong> ${new Date(screenshot.timestamp).toLocaleTimeString()}</p>
                 <p><strong>Position:</strong> ${screenshot.state.position.map(p => p.toFixed(0)).join(', ')}</p>
-                <p><strong>Zoom:</strong> ${screenshot.state.zoom.toFixed(2)}x</p>
+                <p><strong>Scale:</strong> ${screenshot.state.scale.toFixed(2)}x</p>
             </div>
             <div class="screenshot-narration" id="narration-${this.screenshots.length - 1}">
                 <em>Generating narration...</em>
@@ -563,7 +600,7 @@ class NeuroglancerTourguide {
 
     async generateNarrationAnthropic(screenshot) {
         const prompt = `You are viewing electron microscopy data from a ${this.currentDataset === 'celegans' ? 'C. elegans embryo' : 'HeLa cell'}. 
-The current position is ${screenshot.state.position.map(p => p.toFixed(0)).join(', ')} at ${screenshot.state.zoom.toFixed(2)}x zoom.
+The current position is ${screenshot.state.position.map(p => p.toFixed(0)).join(', ')} at ${screenshot.state.scale.toFixed(2)}x zoom.
 Describe what might be visible in this view in 1-2 sentences, focusing on cellular structures and organelles.`;
         
         const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -594,7 +631,7 @@ Describe what might be visible in this view in 1-2 sentences, focusing on cellul
 
     async generateNarrationOpenAI(screenshot) {
         const prompt = `You are viewing electron microscopy data from a ${this.currentDataset === 'celegans' ? 'C. elegans embryo' : 'HeLa cell'}. 
-The current position is ${screenshot.state.position.map(p => p.toFixed(0)).join(', ')} at ${screenshot.state.zoom.toFixed(2)}x zoom.
+The current position is ${screenshot.state.position.map(p => p.toFixed(0)).join(', ')} at ${screenshot.state.scale.toFixed(2)}x zoom.
 Describe what might be visible in this view in 1-2 sentences, focusing on cellular structures and organelles.`;
         
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -624,7 +661,7 @@ Describe what might be visible in this view in 1-2 sentences, focusing on cellul
 
     async generateNarrationGoogle(screenshot) {
         const prompt = `You are viewing electron microscopy data from a ${this.currentDataset === 'celegans' ? 'C. elegans embryo' : 'HeLa cell'}. 
-The current position is ${screenshot.state.position.map(p => p.toFixed(0)).join(', ')} at ${screenshot.state.zoom.toFixed(2)}x zoom.
+The current position is ${screenshot.state.position.map(p => p.toFixed(0)).join(', ')} at ${screenshot.state.scale.toFixed(2)}x zoom.
 Describe what might be visible in this view in 1-2 sentences, focusing on cellular structures and organelles.`;
         
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.apiConfig.google}`, {
