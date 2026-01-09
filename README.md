@@ -2,7 +2,45 @@
 
 A sidecar service that streams live screenshots and viewer state from Neuroglancer to a browser panel, featuring AI narration, natural language querying of organelle data, interactive plotting and analysis, and movie recording capabilities powered by Gemini, Claude, or local Ollama.
 
-## Features
+## 🆕 Static Site Version Available!
+
+A fully standalone static site version is now available in the [`static-site/`](static-site/) directory. This version:
+- ✅ **No backend required** - Pure HTML/CSS/JavaScript
+- ✅ **Deploy anywhere** - GitHub Pages, Netlify, Vercel, S3, any web server
+- ✅ **Client-side LLM APIs** - Direct integration with Anthropic, OpenAI, and Google
+- ✅ **Public CORS data** - Uses Janelia CellMap S3 Zarr datasets
+- ✅ **Neuroglancer JS** - Standalone JavaScript library
+
+👉 **[Get Started with Static Site →](static-site/README.md)**
+
+## Two Versions Available
+
+### 🌐 Static Site (New!)
+**Location**: [`static-site/`](static-site/)
+
+Perfect for:
+- Simple deployment without backend infrastructure
+- Hosting on GitHub Pages, Netlify, Vercel, etc.
+- Client-side only requirements
+- Direct LLM API usage (Anthropic, OpenAI, Google)
+
+**Limitations**: No local Ollama, no Python code execution, no video recording
+
+### 🐍 Python Backend (Full Featured)
+**Location**: Root directory (server/ and web/)
+
+Perfect for:
+- Full feature set including local Ollama
+- Python code execution for analysis
+- Video recording and compilation
+- WebSocket real-time streaming
+- Custom data pipelines
+
+**Requirements**: Python 3.10+, server infrastructure
+
+---
+
+## Features (Python Backend Version)
 
 - **Live Screenshot Streaming**: Debounced 0.1-5 fps JPEG streaming
 - **State Tracking**: Position, zoom, orientation, layer visibility, and segment selection

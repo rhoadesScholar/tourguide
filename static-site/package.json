@@ -1,0 +1,20 @@
+{
+  "name": "neuroglancer-tourguide-static",
+  "version": "1.0.0",
+  "description": "Static site version of Neuroglancer Tourguide with client-side LLM API integration",
+  "scripts": {
+    "serve": "python -m http.server 8080",
+    "serve-node": "npx http-server -p 8080"
+  },
+  "keywords": [
+    "neuroglancer",
+    "electron-microscopy",
+    "visualization",
+    "ai",
+    "static-site"
+  ],
+  "author": "rhoadesScholar",
+  "license": "BSD-3-Clause",
+  "dependencies": {},
+  "devDependencies": {}
+}

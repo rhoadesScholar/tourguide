@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neuroglancer Tourguide - Static Site</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/neuroglancer@2.38.0/dist/min/neuroglancer.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧠 Neuroglancer Tourguide</h1>
+            <div class="header-controls">
+                <div class="mode-toggle">
+                    <button id="mode-explore" class="mode-btn active">🔭 Explore</button>
+                    <button id="mode-query" class="mode-btn">💬 Query</button>
+                    <button id="mode-analysis" class="mode-btn">📊 Analysis</button>
+                </div>
+                <div class="api-status" id="api-status">
+                    <button id="api-settings-btn" class="settings-btn">⚙️ API Settings</button>
+                    <span class="api-indicator" id="api-indicator">⚪</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- API Configuration Modal -->
+        <div id="api-modal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>API Configuration</h2>
+                <p class="modal-description">Configure your AI API keys for narration and analysis features.</p>
+                
+                <div class="api-provider-tabs">
+                    <button class="api-tab-btn active" data-provider="anthropic">Anthropic (Claude)</button>
+                    <button class="api-tab-btn" data-provider="openai">OpenAI (GPT)</button>
+                    <button class="api-tab-btn" data-provider="google">Google (Gemini)</button>
+                </div>
+
+                <div class="api-config-section" id="anthropic-config">
+                    <label for="anthropic-key">Anthropic API Key:</label>
+                    <input type="password" id="anthropic-key" placeholder="sk-ant-api03-...">
+                    <a href="https://console.anthropic.com/" target="_blank" class="get-key-link">Get API Key</a>
+                    <p class="api-info">Claude models: claude-3-5-sonnet, claude-3-opus</p>
+                </div>
+
+                <div class="api-config-section" id="openai-config" style="display: none;">
+                    <label for="openai-key">OpenAI API Key:</label>
+                    <input type="password" id="openai-key" placeholder="sk-...">
+                    <a href="https://platform.openai.com/api-keys" target="_blank" class="get-key-link">Get API Key</a>
+                    <p class="api-info">GPT models: gpt-4, gpt-4-turbo, gpt-3.5-turbo</p>
+                </div>
+
+                <div class="api-config-section" id="google-config" style="display: none;">
+                    <label for="google-key">Google API Key:</label>
+                    <input type="password" id="google-key" placeholder="AIza...">
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" class="get-key-link">Get API Key</a>
+                    <p class="api-info">Gemini models: gemini-1.5-pro, gemini-1.5-flash</p>
+                </div>
+
+                <div class="modal-actions">
+                    <button id="save-api-config" class="btn-primary">Save Configuration</button>
+                    <button id="test-api-connection" class="btn-secondary">Test Connection</button>
+                </div>
+                <div id="api-test-result" class="api-test-result"></div>
+            </div>
+        </div>
+
+        <main>
+            <div class="viewer-panel">
+                <div class="viewer-header">
+                    <h2>Neuroglancer Viewer</h2>
+                    <div class="viewer-controls">
+                        <select id="dataset-selector">
+                            <option value="celegans">C. elegans (Comma Stage)</option>
+                            <option value="hela">HeLa Cell</option>
+                        </select>
+                        <button id="screenshot-btn" class="btn-secondary">📷 Capture</button>
+                    </div>
+                </div>
+                <div id="neuroglancer-container" class="ng-container"></div>
+            </div>
+
+            <div class="side-panels">
+                <!-- Explore Panel -->
+                <div class="explore-panel" id="explore-panel">
+                    <h2>Exploration</h2>
+                    <div class="explore-tabs">
+                        <button class="tab-btn active" data-tab="screenshots">Screenshots</button>
+                        <button class="tab-btn" data-tab="narrations">Narrations</button>
+                        <button class="tab-btn" data-tab="state">State</button>
+                    </div>
+                    
+                    <div class="tab-content active" id="screenshots-tab">
+                        <div class="screenshots-container" id="screenshots-container">
+                            <div class="placeholder">
+                                <p>📸 Take screenshots to see them here with AI narration...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="narrations-tab">
+                        <div class="narrations-list" id="narrations-list">
+                            <div class="placeholder">
+                                <p>🎙️ AI narrations will appear here...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="state-tab">
+                        <div class="state-info" id="state-info">
+                            <div class="placeholder">
+                                <p>📊 Viewer state information will appear here...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Query Panel -->
+                <div class="query-panel" id="query-panel" style="display: none;">
+                    <h2>Query Organelles</h2>
+                    <div class="query-input-section">
+                        <textarea id="query-input" placeholder="Ask about organelles... (e.g., 'show the largest mitochondrion')"></textarea>
+                        <button id="query-submit" class="btn-primary">Ask</button>
+                    </div>
+                    <div class="query-results" id="query-results">
+                        <div class="placeholder">
+                            <p>💬 Ask questions about organelles in natural language...</p>
+                            <p class="examples">Examples:</p>
+                            <ul>
+                                <li>"show the largest mitochondrion"</li>
+                                <li>"how many nuclei are there?"</li>
+                                <li>"take me to the smallest peroxisome"</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analysis Panel -->
+                <div class="analysis-panel" id="analysis-panel" style="display: none;">
+                    <h2>Data Analysis</h2>
+                    <div class="analysis-input-section">
+                        <textarea id="analysis-input" placeholder="Ask for data analysis... (e.g., 'plot the volume distribution of mitochondria')"></textarea>
+                        <button id="analysis-submit" class="btn-primary">Analyze</button>
+                    </div>
+                    <div class="analysis-results" id="analysis-results">
+                        <div class="placeholder">
+                            <p>📊 Request data analysis and visualizations...</p>
+                            <p class="examples">Examples:</p>
+                            <ul>
+                                <li>"Plot the volume distribution of mitochondria"</li>
+                                <li>"Show me a histogram of nucleus sizes"</li>
+                                <li>"Compare mitochondria volume vs surface area"</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Neuroglancer Tourguide - Static Site | Data from Janelia CellMap | 
+                <a href="https://github.com/rhoadesScholar/tourguide" target="_blank">GitHub</a>
+            </p>
+        </footer>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
