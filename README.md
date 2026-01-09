@@ -11,7 +11,9 @@ A fully standalone static site version is now available in the [`static-site/`](
 - ✅ **Public CORS data** - Uses Janelia CellMap S3 Zarr datasets
 - ✅ **Neuroglancer JS** - Standalone JavaScript library
 
-👉 **[Get Started with Static Site →](static-site/README.md)**
+👉 **[Get Started with Static Site →](static-site/README.md)**  
+📊 **[Compare Features: Static vs Backend →](COMPARISON.md)**  
+🚀 **[Deployment Guide →](static-site/DEPLOYMENT.md)**
 
 ## Two Versions Available
 
