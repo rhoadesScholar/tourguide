@@ -2,16 +2,8 @@
  * Unit tests for OrganelleDataManager
  */
 
-// Load the organelle-data.js file
-const fs = require('fs');
-const path = require('path');
-const organelleDataCode = fs.readFileSync(
-  path.join(__dirname, '../organelle-data.js'),
-  'utf8'
-);
-
-// Evaluate the code in the test environment
-eval(organelleDataCode);
+// Load the OrganelleDataManager class
+const OrganelleDataManager = require('../organelle-data.js');
 
 describe('OrganelleDataManager', () => {
   let manager;

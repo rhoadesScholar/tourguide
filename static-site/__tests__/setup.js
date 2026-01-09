@@ -1,7 +1,7 @@
 // Jest setup file
-// Mock localStorage
+// Mock localStorage with updatable mock functions
 const localStorageMock = {
-  getItem: jest.fn(),
+  getItem: jest.fn(() => null),
   setItem: jest.fn(),
   removeItem: jest.fn(),
   clear: jest.fn(),
@@ -19,13 +19,23 @@ global.console = {
 };
 
 // Mock fetch
-global.fetch = jest.fn();
+global.fetch = jest.fn(() => Promise.resolve({
+  ok: true,
+  json: async () => ({}),
+  text: async () => '',
+}));
 
 // Reset mocks before each test
 beforeEach(() => {
-  jest.clearAllMocks();
-  localStorage.getItem.mockReturnValue(null);
-  fetch.mockResolvedValue({
+  // Clear mock history but keep mock functions
+  localStorageMock.getItem.mockClear();
+  localStorageMock.getItem.mockReturnValue(null);
+  localStorageMock.setItem.mockClear();
+  localStorageMock.removeItem.mockClear();
+  localStorageMock.clear.mockClear();
+  
+  global.fetch.mockClear();
+  global.fetch.mockResolvedValue({
     ok: true,
     json: async () => ({}),
     text: async () => '',

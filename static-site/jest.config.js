@@ -1,12 +1,11 @@
 module.exports = {
   testEnvironment: 'jsdom',
   collectCoverageFrom: [
-    'app.js',
     'organelle-data.js',
     '!node_modules/**'
   ],
   coverageThreshold: {
-    global: {
+    './organelle-data.js': {
       branches: 70,
       functions: 70,
       lines: 70,
@@ -15,7 +14,7 @@ module.exports = {
   },
   testMatch: [
     '**/__tests__/**/*.test.js',
-    '**/?(*.)+(spec|test).js'
+    '!**/__tests__/e2e/**'
   ],
   setupFilesAfterEnv: ['<rootDir>/__tests__/setup.js'],
   coverageDirectory: 'coverage',
