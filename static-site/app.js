@@ -55,14 +55,14 @@ class NeuroglancerTourguide {
     init() {
         console.log('🚀 Initializing Neuroglancer Tourguide...');
         
-        // Initialize Neuroglancer viewer
-        this.initViewer();
-        
-        // Setup UI event listeners
+        // Setup UI event listeners first (so UI works even if viewer fails)
         this.setupEventListeners();
         
         // Load API configuration UI state
         this.updateAPIStatus();
+        
+        // Initialize Neuroglancer viewer (with error handling)
+        this.initViewer();
         
         console.log('✅ Initialization complete');
     }
@@ -70,20 +70,47 @@ class NeuroglancerTourguide {
     initViewer() {
         console.log('🧠 Initializing Neuroglancer viewer...');
         
+        try {
+            const container = document.getElementById('neuroglancer-container');
+            
+            // Check if Neuroglancer is available
+            if (typeof neuroglancer === 'undefined') {
+                console.warn('⚠️ Neuroglancer library not available. Running in mock mode.');
+                this.showViewerError('Neuroglancer library not loaded. Some features may not be available.');
+                return;
+            }
+            
+            // Create Neuroglancer viewer
+            this.viewer = new neuroglancer.Viewer(container);
+            
+            // Load initial dataset by setting state
+            this.loadDataset(this.currentDataset);
+            
+            // Setup state change listener using Neuroglancer's state management
+            this.viewer.state.changed.add(() => {
+                this.onViewerStateChanged();
+            });
+            
+            console.log('✅ Neuroglancer viewer initialized');
+        } catch (error) {
+            console.error('❌ Failed to initialize Neuroglancer:', error);
+            this.showViewerError(`Failed to initialize viewer: ${error.message}`);
+        }
+    }
+
+    showViewerError(message) {
         const container = document.getElementById('neuroglancer-container');
-        
-        // Create Neuroglancer viewer
-        this.viewer = new neuroglancer.Viewer(container);
-        
-        // Load initial dataset by setting state
-        this.loadDataset(this.currentDataset);
-        
-        // Setup state change listener using Neuroglancer's state management
-        this.viewer.state.changed.add(() => {
-            this.onViewerStateChanged();
-        });
-        
-        console.log('✅ Neuroglancer viewer initialized');
+        if (container) {
+            container.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); text-align: center; padding: 2rem;">
+                    <div>
+                        <p style="font-size: 1.2rem; margin-bottom: 1rem;">⚠️ Viewer Unavailable</p>
+                        <p>${message}</p>
+                        <p style="margin-top: 1rem; font-size: 0.9rem;">The rest of the application is still functional.</p>
+                    </div>
+                </div>
+            `;
+        }
     }
 
     loadDataset(datasetName) {
@@ -91,18 +118,29 @@ class NeuroglancerTourguide {
         
         this.currentDataset = datasetName;
         
-        // Build state object based on dataset
-        let state;
-        if (datasetName === 'celegans') {
-            state = this.getCelegansState();
-        } else if (datasetName === 'hela') {
-            state = this.getHelaState();
+        // Check if viewer is available
+        if (!this.viewer) {
+            console.warn('⚠️ Viewer not initialized, cannot load dataset');
+            return;
         }
         
-        // Set the viewer state
-        this.viewer.state.restoreState(state);
-        
-        console.log(`✅ Dataset loaded: ${datasetName}`);
+        try {
+            // Build state object based on dataset
+            let state;
+            if (datasetName === 'celegans') {
+                state = this.getCelegansState();
+            } else if (datasetName === 'hela') {
+                state = this.getHelaState();
+            }
+            
+            // Set the viewer state
+            this.viewer.state.restoreState(state);
+            
+            console.log(`✅ Dataset loaded: ${datasetName}`);
+        } catch (error) {
+            console.error(`❌ Failed to load dataset ${datasetName}:`, error);
+            this.showViewerError(`Failed to load dataset: ${error.message}`);
+        }
     }
 
     getCelegansState() {
@@ -601,6 +639,15 @@ class NeuroglancerTourguide {
     }
 
     getCurrentState() {
+        if (!this.viewer || !this.viewer.state) {
+            console.warn('⚠️ Viewer not available for state capture');
+            return {
+                position: [0, 0, 0],
+                scale: 1,
+                dataset: this.currentDataset
+            };
+        }
+        
         try {
             const state = this.viewer.state.toJSON();
             const position = state.position || [0, 0, 0];
