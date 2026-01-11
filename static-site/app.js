@@ -101,15 +101,29 @@ class NeuroglancerTourguide {
     showViewerError(message) {
         const container = document.getElementById('neuroglancer-container');
         if (container) {
-            container.innerHTML = `
-                <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); text-align: center; padding: 2rem;">
-                    <div>
-                        <p style="font-size: 1.2rem; margin-bottom: 1rem;">⚠️ Viewer Unavailable</p>
-                        <p>${message}</p>
-                        <p style="margin-top: 1rem; font-size: 0.9rem;">The rest of the application is still functional.</p>
-                    </div>
-                </div>
-            `;
+            // Create elements safely to avoid XSS
+            container.innerHTML = '';
+            const wrapper = document.createElement('div');
+            wrapper.style.cssText = 'display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); text-align: center; padding: 2rem;';
+            
+            const content = document.createElement('div');
+            
+            const title = document.createElement('p');
+            title.style.cssText = 'font-size: 1.2rem; margin-bottom: 1rem;';
+            title.textContent = '⚠️ Viewer Unavailable';
+            
+            const messageEl = document.createElement('p');
+            messageEl.textContent = message;
+            
+            const footer = document.createElement('p');
+            footer.style.cssText = 'margin-top: 1rem; font-size: 0.9rem;';
+            footer.textContent = 'The rest of the application is still functional.';
+            
+            content.appendChild(title);
+            content.appendChild(messageEl);
+            content.appendChild(footer);
+            wrapper.appendChild(content);
+            container.appendChild(wrapper);
         }
     }
 
