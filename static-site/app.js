@@ -111,7 +111,8 @@ class NeuroglancerTourguide {
     showViewerError(message, details = null) {
         const container = document.getElementById('neuroglancer-container');
         if (container) {
-            // Create elements safely to avoid XSS
+            // Clear container content safely using textContent instead of innerHTML
+            // This is safe and sufficient since we're replacing all content with new elements
             container.textContent = '';
             const wrapper = document.createElement('div');
             wrapper.style.cssText = 'display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary, #999); text-align: center; padding: 2rem;';
