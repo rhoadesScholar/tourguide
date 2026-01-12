@@ -102,7 +102,7 @@ class NeuroglancerTourguide {
         } catch (error) {
             console.error('❌ Failed to initialize Neuroglancer:', error);
             this.showViewerError(
-                `Failed to initialize viewer: ${error.message}`,
+                'Failed to initialize viewer.',
                 'There was an error creating the Neuroglancer viewer. Please try refreshing the page.'
             );
         }
@@ -112,9 +112,9 @@ class NeuroglancerTourguide {
         const container = document.getElementById('neuroglancer-container');
         if (container) {
             // Create elements safely to avoid XSS
-            container.innerHTML = '';
+            container.textContent = '';
             const wrapper = document.createElement('div');
-            wrapper.style.cssText = 'display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary); text-align: center; padding: 2rem;';
+            wrapper.style.cssText = 'display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary, #999); text-align: center; padding: 2rem;';
             
             const content = document.createElement('div');
             
@@ -128,7 +128,7 @@ class NeuroglancerTourguide {
             
             if (details) {
                 const detailsEl = document.createElement('p');
-                detailsEl.style.cssText = 'font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;';
+                detailsEl.style.cssText = 'font-size: 0.9rem; color: var(--text-secondary, #999); margin-bottom: 1rem;';
                 detailsEl.textContent = details;
                 content.appendChild(title);
                 content.appendChild(messageEl);
@@ -174,7 +174,7 @@ class NeuroglancerTourguide {
             console.log(`✅ Dataset loaded: ${datasetName}`);
         } catch (error) {
             console.error(`❌ Failed to load dataset ${datasetName}:`, error);
-            this.showViewerError(`Failed to load dataset: ${error.message}`);
+            this.showViewerError('Failed to load dataset. Please try again later.');
         }
     }
 
@@ -679,7 +679,8 @@ class NeuroglancerTourguide {
             return {
                 position: [0, 0, 0],
                 scale: 1,
-                dataset: this.currentDataset
+                dataset: this.currentDataset,
+                available: false
             };
         }
         
@@ -691,14 +692,16 @@ class NeuroglancerTourguide {
             return {
                 position: [position[0], position[1], position[2]],
                 scale,
-                dataset: this.currentDataset
+                dataset: this.currentDataset,
+                available: true
             };
         } catch (error) {
             console.error('Error getting current state:', error);
             return {
                 position: [0, 0, 0],
                 scale: 1,
-                dataset: this.currentDataset
+                dataset: this.currentDataset,
+                available: false
             };
         }
     }
@@ -1125,7 +1128,7 @@ Explain what analysis would be performed and what type of visualization would be
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('🚀 DOM loaded, waiting for Neuroglancer...');
     
-    let timeoutId;
+    let timeoutId = null;
     try {
         // Wait for Neuroglancer to load (with timeout)
         await Promise.race([
@@ -1139,10 +1142,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         ]);
         console.log('✅ Neuroglancer library ready');
     } catch (error) {
-        console.warn('⚠️ Neuroglancer failed to load:', error.message);
+        // Distinguish between timeout and CDN failure
+        if (error.message === 'Neuroglancer load timeout') {
+            console.warn('⚠️ Neuroglancer load timeout: Library took too long to load');
+        } else if (error.message === 'All CDN sources failed') {
+            console.warn('⚠️ Neuroglancer CDN failure: All CDN sources failed to load the library');
+        } else {
+            console.warn('⚠️ Neuroglancer failed to load:', error.message);
+        }
     } finally {
         // Always clear timeout to prevent memory leaks
-        if (timeoutId) clearTimeout(timeoutId);
+        if (timeoutId !== null) {
+            clearTimeout(timeoutId);
+        }
     }
     
     // Initialize app regardless of Neuroglancer status
