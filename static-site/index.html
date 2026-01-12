@@ -20,7 +20,7 @@
             script1.onerror = () => {
                 console.warn('⚠️ Failed to load from unpkg.com, trying jsdelivr...');
                 // Remove failed script from DOM
-                document.head.removeChild(script1);
+                script1.remove();
                 
                 // Try fallback CDN (jsdelivr)
                 const script2 = document.createElement('script');
@@ -32,7 +32,7 @@
                 script2.onerror = () => {
                     console.error('❌ Failed to load Neuroglancer from all CDNs');
                     // Remove failed script from DOM
-                    document.head.removeChild(script2);
+                    script2.remove();
                     reject(new Error('All CDN sources failed'));
                 };
                 document.head.appendChild(script2);

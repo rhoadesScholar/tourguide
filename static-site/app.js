@@ -1126,11 +1126,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         // Wait for Neuroglancer to load (with timeout)
         await Promise.race([
-            window.neuroglancerLoading.then(result => {
-                // Clear timeout if Neuroglancer loads successfully
-                if (timeoutId) clearTimeout(timeoutId);
-                return result;
-            }),
+            window.neuroglancerLoading,
             new Promise((_, reject) => {
                 timeoutId = setTimeout(() => reject(new Error('Neuroglancer load timeout')), 10000);
             })
@@ -1138,7 +1134,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('✅ Neuroglancer library ready');
     } catch (error) {
         console.warn('⚠️ Neuroglancer failed to load:', error.message);
-        // Clear timeout on error too
+    } finally {
+        // Always clear timeout to prevent memory leaks
         if (timeoutId) clearTimeout(timeoutId);
     }
     
