@@ -37,6 +37,9 @@ const CONFIG = {
     security: {
         storageKey: 'ng-tourguide-api-config',
         storageWarning: '⚠️ API keys are stored in browser localStorage. Do not use this on shared computers. Keys are only sent to their respective API providers.'
+    },
+    neuroglancer: {
+        loadTimeoutMs: 10000 // 10 seconds timeout for loading Neuroglancer library
     }
 };
 
@@ -1128,7 +1131,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         await Promise.race([
             window.neuroglancerLoading,
             new Promise((_, reject) => {
-                timeoutId = setTimeout(() => reject(new Error('Neuroglancer load timeout')), 10000);
+                timeoutId = setTimeout(
+                    () => reject(new Error('Neuroglancer load timeout')), 
+                    CONFIG.neuroglancer.loadTimeoutMs
+                );
             })
         ]);
         console.log('✅ Neuroglancer library ready');
