@@ -76,7 +76,11 @@ class NeuroglancerTourguide {
             // Check if Neuroglancer is available
             if (typeof neuroglancer === 'undefined') {
                 console.warn('⚠️ Neuroglancer library not available. Running in mock mode.');
-                this.showViewerError('Neuroglancer library not loaded. Some features may not be available.');
+                this.showViewerError(
+                    'Neuroglancer library could not be loaded.',
+                    'This may be due to a network issue, content blocker, or CDN availability. ' +
+                    'Please check your internet connection and try refreshing the page.'
+                );
                 return;
             }
             
@@ -94,11 +98,14 @@ class NeuroglancerTourguide {
             console.log('✅ Neuroglancer viewer initialized');
         } catch (error) {
             console.error('❌ Failed to initialize Neuroglancer:', error);
-            this.showViewerError(`Failed to initialize viewer: ${error.message}`);
+            this.showViewerError(
+                `Failed to initialize viewer: ${error.message}`,
+                'There was an error creating the Neuroglancer viewer. Please try refreshing the page.'
+            );
         }
     }
 
-    showViewerError(message) {
+    showViewerError(message, details = null) {
         const container = document.getElementById('neuroglancer-container');
         if (container) {
             // Create elements safely to avoid XSS
@@ -113,14 +120,25 @@ class NeuroglancerTourguide {
             title.textContent = '⚠️ Viewer Unavailable';
             
             const messageEl = document.createElement('p');
+            messageEl.style.cssText = 'margin-bottom: 0.5rem;';
             messageEl.textContent = message;
+            
+            if (details) {
+                const detailsEl = document.createElement('p');
+                detailsEl.style.cssText = 'font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;';
+                detailsEl.textContent = details;
+                content.appendChild(title);
+                content.appendChild(messageEl);
+                content.appendChild(detailsEl);
+            } else {
+                content.appendChild(title);
+                content.appendChild(messageEl);
+            }
             
             const footer = document.createElement('p');
             footer.style.cssText = 'margin-top: 1rem; font-size: 0.9rem;';
             footer.textContent = 'The rest of the application is still functional.';
             
-            content.appendChild(title);
-            content.appendChild(messageEl);
             content.appendChild(footer);
             wrapper.appendChild(content);
             container.appendChild(wrapper);
@@ -1100,7 +1118,21 @@ Explain what analysis would be performed and what type of visualization would be
     }
 }
 
-// Initialize application when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
+// Initialize application when DOM is ready AND Neuroglancer is loaded
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🚀 DOM loaded, waiting for Neuroglancer...');
+    
+    try {
+        // Wait for Neuroglancer to load (with timeout)
+        await Promise.race([
+            window.neuroglancerLoading,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Neuroglancer load timeout')), 10000))
+        ]);
+        console.log('✅ Neuroglancer library ready');
+    } catch (error) {
+        console.warn('⚠️ Neuroglancer failed to load:', error.message);
+    }
+    
+    // Initialize app regardless of Neuroglancer status
     window.app = new NeuroglancerTourguide();
 });
