@@ -64,10 +64,45 @@ class NeuroglancerTourguide {
         // Load API configuration UI state
         this.updateAPIStatus();
         
+        // Check for URL parameters to load specific dataset
+        this.checkURLParameters();
+        
         // Initialize Neuroglancer viewer (with error handling)
         this.initViewer();
         
         console.log('✅ Initialization complete');
+    }
+
+    checkURLParameters() {
+        // Check if a dataset URL is specified in the query parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const datasetURL = urlParams.get('url');
+        const datasetId = urlParams.get('dataset');
+        
+        if (datasetURL) {
+            console.log('📎 Dataset URL found in parameters:', datasetURL);
+            
+            // Pre-fill the input and trigger load after viewer initializes
+            document.getElementById('openorganelle-url').value = datasetURL;
+            
+            // Show the custom input
+            document.getElementById('dataset-selector').value = 'custom';
+            document.getElementById('custom-dataset-input').style.display = 'flex';
+            
+            // Schedule the load to happen after viewer initialization
+            setTimeout(() => {
+                this.loadOpenOrganelleDataset();
+            }, 1000);
+        } else if (datasetId && CONFIG.datasets[datasetId]) {
+            // Load a pre-configured dataset
+            console.log('📎 Dataset ID found in parameters:', datasetId);
+            this.currentDataset = datasetId;
+            
+            // Update selector
+            document.getElementById('dataset-selector').value = datasetId;
+            
+            // Will be loaded when viewer initializes
+        }
     }
 
     initViewer() {
@@ -536,6 +571,9 @@ class NeuroglancerTourguide {
         // Screenshot capture
         document.getElementById('screenshot-btn').addEventListener('click', () => this.captureScreenshot());
         
+        // Share dataset button
+        document.getElementById('share-dataset-btn').addEventListener('click', () => this.shareDataset());
+        
         // Explore tabs
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -819,6 +857,53 @@ class NeuroglancerTourguide {
             }
             throw error;
         }
+    }
+
+    shareDataset() {
+        // Generate a shareable link with the current dataset
+        const currentDataset = this.currentDataset;
+        
+        if (!currentDataset) {
+            alert('No dataset loaded to share');
+            return;
+        }
+        
+        // Get the dataset configuration
+        const config = CONFIG.datasets[currentDataset];
+        
+        if (!config) {
+            alert('Cannot share this dataset');
+            return;
+        }
+        
+        // Build the shareable URL
+        let shareableURL;
+        
+        if (config.isOpenOrganelle) {
+            // For OpenOrganelle datasets, use the OpenOrganelle URL format
+            const openOrganelleURL = `https://openorganelle.janelia.org/datasets/${currentDataset}`;
+            shareableURL = `${window.location.origin}${window.location.pathname}?url=${encodeURIComponent(openOrganelleURL)}`;
+        } else {
+            // For pre-configured datasets, just use dataset parameter
+            shareableURL = `${window.location.origin}${window.location.pathname}?dataset=${currentDataset}`;
+        }
+        
+        // Copy to clipboard
+        navigator.clipboard.writeText(shareableURL).then(() => {
+            // Show success message
+            const btn = document.getElementById('share-dataset-btn');
+            const originalText = btn.textContent;
+            btn.textContent = '✅ Copied!';
+            setTimeout(() => {
+                btn.textContent = originalText;
+            }, 2000);
+            
+            console.log('📎 Shareable link copied:', shareableURL);
+        }).catch(err => {
+            // Fallback: show the URL in an alert
+            console.error('Failed to copy to clipboard:', err);
+            alert(`Copy this link to share:\n\n${shareableURL}`);
+        });
     }
 
     async captureScreenshot() {
