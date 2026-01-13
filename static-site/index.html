@@ -18,8 +18,24 @@
                 script.async = false; // Ensure synchronous loading order
                 
                 script.onload = function() {
-                    console.log('✅ Neuroglancer loaded from local lib directory');
-                    resolve();
+                    console.log('✅ Neuroglancer bundle loaded from local lib directory');
+                    
+                    // Now load the shim that exposes the API
+                    const shimScript = document.createElement('script');
+                    shimScript.src = 'lib/neuroglancer-shim.js';
+                    shimScript.async = false;
+                    
+                    shimScript.onload = function() {
+                        console.log('✅ Neuroglancer API wrapper loaded');
+                        resolve();
+                    };
+                    
+                    shimScript.onerror = function() {
+                        console.error('❌ Failed to load Neuroglancer API wrapper');
+                        reject(new Error('Failed to load neuroglancer wrapper'));
+                    };
+                    
+                    (document.head || document.getElementsByTagName('head')[0]).appendChild(shimScript);
                 };
                 
                 script.onerror = function() {
