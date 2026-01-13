@@ -37,6 +37,9 @@ const CONFIG = {
     security: {
         storageKey: 'ng-tourguide-api-config',
         storageWarning: '⚠️ API keys are stored in browser localStorage. Do not use this on shared computers. Keys are only sent to their respective API providers.'
+    },
+    neuroglancer: {
+        loadTimeoutMs: 10000 // 10 seconds timeout for loading Neuroglancer library
     }
 };
 
@@ -55,35 +58,130 @@ class NeuroglancerTourguide {
     init() {
         console.log('🚀 Initializing Neuroglancer Tourguide...');
         
-        // Initialize Neuroglancer viewer
-        this.initViewer();
-        
-        // Setup UI event listeners
+        // Setup UI event listeners first (so UI works even if viewer fails)
         this.setupEventListeners();
         
         // Load API configuration UI state
         this.updateAPIStatus();
         
+        // Check for URL parameters to load specific dataset
+        this.checkURLParameters();
+        
+        // Initialize Neuroglancer viewer (with error handling)
+        this.initViewer();
+        
         console.log('✅ Initialization complete');
+    }
+
+    checkURLParameters() {
+        // Check if a dataset URL is specified in the query parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const datasetURL = urlParams.get('url');
+        const datasetId = urlParams.get('dataset');
+        
+        if (datasetURL) {
+            console.log('📎 Dataset URL found in parameters:', datasetURL);
+            
+            // Pre-fill the input and trigger load after viewer initializes
+            document.getElementById('openorganelle-url').value = datasetURL;
+            
+            // Show the custom input
+            document.getElementById('dataset-selector').value = 'custom';
+            document.getElementById('custom-dataset-input').style.display = 'flex';
+            
+            // Schedule the load to happen after viewer initialization
+            setTimeout(() => {
+                this.loadOpenOrganelleDataset();
+            }, 1000);
+        } else if (datasetId && CONFIG.datasets[datasetId]) {
+            // Load a pre-configured dataset
+            console.log('📎 Dataset ID found in parameters:', datasetId);
+            this.currentDataset = datasetId;
+            
+            // Update selector
+            document.getElementById('dataset-selector').value = datasetId;
+            
+            // Will be loaded when viewer initializes
+        }
     }
 
     initViewer() {
         console.log('🧠 Initializing Neuroglancer viewer...');
         
+        try {
+            const container = document.getElementById('neuroglancer-container');
+            
+            // Check if Neuroglancer is available
+            if (typeof neuroglancer === 'undefined') {
+                console.warn('⚠️ Neuroglancer library not available. Running in mock mode.');
+                this.showViewerError(
+                    'Neuroglancer library could not be loaded.',
+                    'This may be due to a network issue, content blocker, or CDN availability. ' +
+                    'Please check your internet connection and try refreshing the page.'
+                );
+                return;
+            }
+            
+            // Create Neuroglancer viewer
+            this.viewer = new neuroglancer.Viewer(container);
+            
+            // Load initial dataset by setting state
+            this.loadDataset(this.currentDataset);
+            
+            // Setup state change listener using Neuroglancer's state management
+            this.viewer.state.changed.add(() => {
+                this.onViewerStateChanged();
+            });
+            
+            console.log('✅ Neuroglancer viewer initialized');
+        } catch (error) {
+            console.error('❌ Failed to initialize Neuroglancer:', error);
+            this.showViewerError(
+                'Failed to initialize viewer.',
+                'There was an error creating the Neuroglancer viewer. Please try refreshing the page.'
+            );
+        }
+    }
+
+    showViewerError(message, details = null) {
         const container = document.getElementById('neuroglancer-container');
-        
-        // Create Neuroglancer viewer
-        this.viewer = new neuroglancer.Viewer(container);
-        
-        // Load initial dataset by setting state
-        this.loadDataset(this.currentDataset);
-        
-        // Setup state change listener using Neuroglancer's state management
-        this.viewer.state.changed.add(() => {
-            this.onViewerStateChanged();
-        });
-        
-        console.log('✅ Neuroglancer viewer initialized');
+        if (container) {
+            // Clear container content safely using textContent instead of innerHTML
+            // This is safe and sufficient since we're replacing all content with new elements
+            container.textContent = '';
+            const wrapper = document.createElement('div');
+            wrapper.style.cssText = 'display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-secondary, #999); text-align: center; padding: 2rem;';
+            
+            const content = document.createElement('div');
+            
+            const title = document.createElement('p');
+            title.style.cssText = 'font-size: 1.2rem; margin-bottom: 1rem;';
+            title.textContent = '⚠️ Viewer Unavailable';
+            
+            const messageEl = document.createElement('p');
+            messageEl.style.cssText = 'margin-bottom: 0.5rem;';
+            messageEl.textContent = message;
+            
+            if (details) {
+                const detailsEl = document.createElement('p');
+                detailsEl.style.cssText = 'font-size: 0.9rem; color: var(--text-secondary, #999); margin-bottom: 1rem;';
+                detailsEl.textContent = details;
+                content.appendChild(title);
+                content.appendChild(messageEl);
+                content.appendChild(detailsEl);
+            } else {
+                content.appendChild(title);
+                content.appendChild(messageEl);
+            }
+            
+            const footer = document.createElement('p');
+            footer.style.cssText = 'margin-top: 1rem; font-size: 0.9rem;';
+            footer.textContent = 'The rest of the application is still functional.';
+            
+            content.appendChild(footer);
+            wrapper.appendChild(content);
+            container.appendChild(wrapper);
+        }
     }
 
     loadDataset(datasetName) {
@@ -91,18 +189,29 @@ class NeuroglancerTourguide {
         
         this.currentDataset = datasetName;
         
-        // Build state object based on dataset
-        let state;
-        if (datasetName === 'celegans') {
-            state = this.getCelegansState();
-        } else if (datasetName === 'hela') {
-            state = this.getHelaState();
+        // Check if viewer is available
+        if (!this.viewer) {
+            console.warn('⚠️ Viewer not initialized, cannot load dataset');
+            return;
         }
         
-        // Set the viewer state
-        this.viewer.state.restoreState(state);
-        
-        console.log(`✅ Dataset loaded: ${datasetName}`);
+        try {
+            // Build state object based on dataset
+            let state;
+            if (datasetName === 'celegans') {
+                state = this.getCelegansState();
+            } else if (datasetName === 'hela') {
+                state = this.getHelaState();
+            }
+            
+            // Set the viewer state
+            this.viewer.state.restoreState(state);
+            
+            console.log(`✅ Dataset loaded: ${datasetName}`);
+        } catch (error) {
+            console.error(`❌ Failed to load dataset ${datasetName}:`, error);
+            this.showViewerError('Failed to load dataset. Please try again later.');
+        }
     }
 
     getCelegansState() {
@@ -181,6 +290,174 @@ class NeuroglancerTourguide {
                     visible: false
                 }
             ],
+            layout: 'xy-3d'
+        };
+    }
+
+    // OpenOrganelle dataset handling
+    async loadOpenOrganelleDataset() {
+        const input = document.getElementById('openorganelle-url');
+        const urlOrId = input.value.trim();
+        
+        if (!urlOrId) {
+            alert('Please enter an OpenOrganelle URL or dataset ID');
+            return;
+        }
+        
+        try {
+            // Parse the dataset ID
+            const datasetId = this.parseOpenOrganelleURL(urlOrId);
+            console.log(`📊 Loading OpenOrganelle dataset: ${datasetId}`);
+            
+            // Show loading indicator
+            const loadBtn = document.getElementById('load-custom-dataset');
+            const originalText = loadBtn.textContent;
+            loadBtn.textContent = 'Loading...';
+            loadBtn.disabled = true;
+            
+            // Build dataset configuration
+            const datasetConfig = await this.buildOpenOrganelleConfig(datasetId);
+            
+            // Add to CONFIG for future reference
+            CONFIG.datasets[datasetId] = datasetConfig;
+            this.currentDataset = datasetId;
+            
+            // Load the dataset
+            await this.loadDatasetFromConfig(datasetConfig);
+            
+            // Update UI
+            document.getElementById('custom-dataset-input').style.display = 'none';
+            input.value = '';
+            
+            // Update selector to show loaded dataset
+            const selector = document.getElementById('dataset-selector');
+            const existingOption = Array.from(selector.options).find(opt => opt.value === datasetId);
+            if (!existingOption) {
+                const newOption = document.createElement('option');
+                newOption.value = datasetId;
+                newOption.textContent = datasetConfig.name;
+                selector.insertBefore(newOption, selector.options[selector.options.length - 1]);
+            }
+            selector.value = datasetId;
+            
+            console.log(`✅ OpenOrganelle dataset loaded: ${datasetId}`);
+            
+            // Reset button
+            loadBtn.textContent = originalText;
+            loadBtn.disabled = false;
+            
+        } catch (error) {
+            console.error('❌ Failed to load OpenOrganelle dataset:', error);
+            alert(`Failed to load dataset: ${error.message}`);
+            
+            // Reset button
+            const loadBtn = document.getElementById('load-custom-dataset');
+            loadBtn.textContent = 'Load Dataset';
+            loadBtn.disabled = false;
+        }
+    }
+    
+    parseOpenOrganelleURL(urlOrId) {
+        // Extract dataset ID from URL or return as-is if already an ID
+        // Examples:
+        // "https://openorganelle.janelia.org/datasets/jrc_mus-liver" -> "jrc_mus-liver"
+        // "jrc_mus-liver" -> "jrc_mus-liver"
+        
+        if (urlOrId.includes('openorganelle.janelia.org')) {
+            const match = urlOrId.match(/datasets\/([^/?]+)/);
+            if (match) {
+                return match[1];
+            }
+        }
+        
+        // Assume it's already a dataset ID
+        return urlOrId;
+    }
+    
+    async buildOpenOrganelleConfig(datasetId) {
+        // Build configuration for OpenOrganelle dataset
+        // Following the standard pattern: s3://janelia-cosem-datasets/{dataset-id}/{dataset-id}
+        
+        const baseUrl = `s3://janelia-cosem-datasets/${datasetId}/${datasetId}`;
+        
+        // Try to fetch metadata (this may fail due to CORS, so we use default values)
+        let resolution = [4e-9, 4e-9, 4e-9]; // Default 4nm isotropic
+        let dimensions = {
+            x: [resolution[0], 'm'],
+            y: [resolution[1], 'm'],
+            z: [resolution[2], 'm']
+        };
+        
+        // Common organelle types in OpenOrganelle datasets
+        const commonOrganelles = [
+            'mito', 'er', 'eres', 'golgi', 'vesicle', 'mvb', 
+            'endo', 'perox', 'ld', 'nucleus', 'ne', 'np', 
+            'mt', 'plasma_membrane', 'cell', 'ribosomes'
+        ];
+        
+        return {
+            name: `OpenOrganelle: ${datasetId}`,
+            baseUrl: baseUrl,
+            dimensions: dimensions,
+            initialPosition: [10000, 10000, 10000], // Default position
+            organelles: commonOrganelles,
+            isOpenOrganelle: true
+        };
+    }
+    
+    async loadDatasetFromConfig(config) {
+        console.log(`📊 Loading dataset from config: ${config.name}`);
+        
+        if (!this.viewer) {
+            console.warn('⚠️ Viewer not initialized, cannot load dataset');
+            return;
+        }
+        
+        try {
+            // Build state object for this dataset
+            const state = this.buildOpenOrganelleState(config);
+            
+            // Set the viewer state
+            this.viewer.state.restoreState(state);
+            
+            console.log(`✅ Dataset loaded from config`);
+        } catch (error) {
+            console.error(`❌ Failed to load dataset from config:`, error);
+            this.showViewerError('Failed to load dataset. Please try again later.');
+        }
+    }
+    
+    buildOpenOrganelleState(config) {
+        // Build Neuroglancer state for OpenOrganelle dataset
+        const baseUrl = config.baseUrl;
+        
+        const layers = [
+            // Raw EM data layer
+            {
+                type: 'image',
+                source: `${baseUrl}.n5/em/fibsem-uint8`,
+                name: 'EM',
+                shader: '#uicontrol invlerp normalized\nvoid main() { emitGrayscale(normalized()); }'
+            }
+        ];
+        
+        // Add common segmentation layers (they may not all exist, but Neuroglancer will skip missing ones)
+        const segmentations = ['mito', 'er', 'nucleus', 'golgi', 'vesicle', 'ld', 'perox'];
+        segmentations.forEach(organelle => {
+            layers.push({
+                type: 'segmentation',
+                source: `${baseUrl}.n5/labels/${organelle}`,
+                name: organelle,
+                visible: false
+            });
+        });
+        
+        return {
+            dimensions: config.dimensions,
+            position: config.initialPosition,
+            crossSectionScale: 10,
+            projectionScale: 100000,
+            layers: layers,
             layout: 'xy-3d'
         };
     }
@@ -265,11 +542,37 @@ class NeuroglancerTourguide {
         
         // Dataset selector
         document.getElementById('dataset-selector').addEventListener('change', (e) => {
-            this.loadDataset(e.target.value);
+            const value = e.target.value;
+            const customInput = document.getElementById('custom-dataset-input');
+            
+            if (value === 'custom') {
+                // Show custom dataset input
+                customInput.style.display = 'flex';
+            } else {
+                // Hide custom input and load pre-configured dataset
+                customInput.style.display = 'none';
+                this.loadDataset(e.target.value);
+            }
+        });
+        
+        // Custom dataset loading
+        document.getElementById('load-custom-dataset').addEventListener('click', () => this.loadOpenOrganelleDataset());
+        document.getElementById('cancel-custom-dataset').addEventListener('click', () => {
+            document.getElementById('custom-dataset-input').style.display = 'none';
+            document.getElementById('dataset-selector').value = this.currentDataset;
+        });
+        document.getElementById('openorganelle-url').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.loadCustomDataset();
+            }
         });
         
         // Screenshot capture
         document.getElementById('screenshot-btn').addEventListener('click', () => this.captureScreenshot());
+        
+        // Share dataset button
+        document.getElementById('share-dataset-btn').addEventListener('click', () => this.shareDataset());
         
         // Explore tabs
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -556,6 +859,53 @@ class NeuroglancerTourguide {
         }
     }
 
+    shareDataset() {
+        // Generate a shareable link with the current dataset
+        const currentDataset = this.currentDataset;
+        
+        if (!currentDataset) {
+            alert('No dataset loaded to share');
+            return;
+        }
+        
+        // Get the dataset configuration
+        const config = CONFIG.datasets[currentDataset];
+        
+        if (!config) {
+            alert('Cannot share this dataset');
+            return;
+        }
+        
+        // Build the shareable URL
+        let shareableURL;
+        
+        if (config.isOpenOrganelle) {
+            // For OpenOrganelle datasets, use the OpenOrganelle URL format
+            const openOrganelleURL = `https://openorganelle.janelia.org/datasets/${currentDataset}`;
+            shareableURL = `${window.location.origin}${window.location.pathname}?url=${encodeURIComponent(openOrganelleURL)}`;
+        } else {
+            // For pre-configured datasets, just use dataset parameter
+            shareableURL = `${window.location.origin}${window.location.pathname}?dataset=${currentDataset}`;
+        }
+        
+        // Copy to clipboard
+        navigator.clipboard.writeText(shareableURL).then(() => {
+            // Show success message
+            const btn = document.getElementById('share-dataset-btn');
+            const originalText = btn.textContent;
+            btn.textContent = '✅ Copied!';
+            setTimeout(() => {
+                btn.textContent = originalText;
+            }, 2000);
+            
+            console.log('📎 Shareable link copied:', shareableURL);
+        }).catch(err => {
+            // Fallback: show the URL in an alert
+            console.error('Failed to copy to clipboard:', err);
+            alert(`Copy this link to share:\n\n${shareableURL}`);
+        });
+    }
+
     async captureScreenshot() {
         console.log('📸 Capturing screenshot...');
         
@@ -601,6 +951,16 @@ class NeuroglancerTourguide {
     }
 
     getCurrentState() {
+        if (!this.viewer || !this.viewer.state) {
+            console.warn('⚠️ Viewer not available for state capture');
+            return {
+                position: [0, 0, 0],
+                scale: 1,
+                dataset: this.currentDataset,
+                available: false
+            };
+        }
+        
         try {
             const state = this.viewer.state.toJSON();
             const position = state.position || [0, 0, 0];
@@ -609,14 +969,16 @@ class NeuroglancerTourguide {
             return {
                 position: [position[0], position[1], position[2]],
                 scale,
-                dataset: this.currentDataset
+                dataset: this.currentDataset,
+                available: true
             };
         } catch (error) {
             console.error('Error getting current state:', error);
             return {
                 position: [0, 0, 0],
                 scale: 1,
-                dataset: this.currentDataset
+                dataset: this.currentDataset,
+                available: false
             };
         }
     }
@@ -1039,7 +1401,39 @@ Explain what analysis would be performed and what type of visualization would be
     }
 }
 
-// Initialize application when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
+// Initialize application when DOM is ready AND Neuroglancer is loaded
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🚀 DOM loaded, waiting for Neuroglancer...');
+    
+    let timeoutId = null;
+    try {
+        // Wait for Neuroglancer to load (with timeout)
+        await Promise.race([
+            window.neuroglancerLoading,
+            new Promise((_, reject) => {
+                timeoutId = setTimeout(
+                    () => reject(new Error('Neuroglancer load timeout')), 
+                    CONFIG.neuroglancer.loadTimeoutMs
+                );
+            })
+        ]);
+        console.log('✅ Neuroglancer library ready');
+    } catch (error) {
+        // Distinguish between timeout and CDN failure
+        if (error.message === 'Neuroglancer load timeout') {
+            console.warn('⚠️ Neuroglancer load timeout: Library took too long to load');
+        } else if (error.message === 'All CDN sources failed') {
+            console.warn('⚠️ Neuroglancer CDN failure: All CDN sources failed to load the library');
+        } else {
+            console.warn('⚠️ Neuroglancer failed to load:', error.message);
+        }
+    } finally {
+        // Always clear timeout to prevent memory leaks
+        if (timeoutId !== null) {
+            clearTimeout(timeoutId);
+        }
+    }
+    
+    // Initialize app regardless of Neuroglancer status
     window.app = new NeuroglancerTourguide();
 });

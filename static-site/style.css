@@ -580,6 +580,33 @@ footer a:hover {
     text-decoration: underline;
 }
 
+/* Custom Dataset Input */
+.custom-dataset-input {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    align-items: center;
+}
+
+.custom-dataset-input input {
+    flex: 1;
+    padding: 0.5rem;
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.custom-dataset-input input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+.custom-dataset-input input::placeholder {
+    color: var(--text-secondary);
+}
+
 /* Loading Spinner */
 .loading {
     display: inline-block;

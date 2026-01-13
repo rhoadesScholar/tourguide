@@ -5,7 +5,63 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Neuroglancer Tourguide - Static Site</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://unpkg.com/neuroglancer@2.38.0/dist/min/neuroglancer.js"></script>
+    
+    <!-- Load Neuroglancer with fallback CDNs -->
+    <script>
+        // Track if Neuroglancer loaded successfully
+        window.neuroglancerLoading = new Promise((resolve, reject) => {
+            // Ensure DOM is ready before manipulating scripts
+            function loadNeuroglancer() {
+                // Try primary CDN (unpkg)
+                const script1 = document.createElement('script');
+                script1.src = 'https://unpkg.com/neuroglancer@2.38.0/dist/min/neuroglancer.js';
+                script1.async = false; // Ensure synchronous loading order
+                
+                script1.onload = function() {
+                    console.log('✅ Neuroglancer loaded from unpkg.com');
+                    resolve();
+                };
+                
+                script1.onerror = function() {
+                    console.warn('⚠️ Failed to load from unpkg.com, trying jsdelivr...');
+                    // Remove failed script from DOM (with fallback for older browsers)
+                    if (script1.parentNode) {
+                        script1.parentNode.removeChild(script1);
+                    }
+                    
+                    // Try fallback CDN (jsdelivr)
+                    const script2 = document.createElement('script');
+                    script2.src = 'https://cdn.jsdelivr.net/npm/neuroglancer@2.38.0/dist/min/neuroglancer.js';
+                    script2.async = false;
+                    
+                    script2.onload = function() {
+                        console.log('✅ Neuroglancer loaded from jsdelivr.net');
+                        resolve();
+                    };
+                    
+                    script2.onerror = function() {
+                        console.error('❌ Failed to load Neuroglancer from all CDNs');
+                        // Remove failed script from DOM (with fallback for older browsers)
+                        if (script2.parentNode) {
+                            script2.parentNode.removeChild(script2);
+                        }
+                        reject(new Error('All CDN sources failed'));
+                    };
+                    
+                    (document.head || document.getElementsByTagName('head')[0]).appendChild(script2);
+                };
+                
+                (document.head || document.getElementsByTagName('head')[0]).appendChild(script1);
+            }
+            
+            // Execute when DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', loadNeuroglancer);
+            } else {
+                loadNeuroglancer();
+            }
+        });
+    </script>
     <script src="organelle-data.js"></script>
 </head>
 <body>
@@ -79,8 +135,15 @@
                         <select id="dataset-selector">
                             <option value="celegans">C. elegans (Comma Stage)</option>
                             <option value="hela">HeLa Cell</option>
+                            <option value="custom">Load from OpenOrganelle...</option>
                         </select>
                         <button id="screenshot-btn" class="btn-secondary">📷 Capture</button>
+                        <button id="share-dataset-btn" class="btn-secondary" title="Copy shareable link">🔗 Share</button>
+                    </div>
+                    <div id="custom-dataset-input" class="custom-dataset-input" style="display: none;">
+                        <input type="text" id="openorganelle-url" placeholder="Paste OpenOrganelle URL or dataset ID (e.g., jrc_mus-liver)" />
+                        <button id="load-custom-dataset" class="btn-primary">Load Dataset</button>
+                        <button id="cancel-custom-dataset" class="btn-secondary">Cancel</button>
                     </div>
                 </div>
                 <div id="neuroglancer-container" class="ng-container"></div>
@@ -131,12 +194,14 @@
                     <div class="query-results" id="query-results">
                         <div class="placeholder">
                             <p>💬 Ask questions about organelles in natural language...</p>
-                            <p class="examples">Examples:</p>
-                            <ul>
-                                <li>"show the largest mitochondrion"</li>
-                                <li>"how many nuclei are there?"</li>
-                                <li>"take me to the smallest peroxisome"</li>
-                            </ul>
+                            <div class="examples">
+                                <p>Examples:</p>
+                                <ul>
+                                    <li>"show the largest mitochondrion"</li>
+                                    <li>"how many nuclei are there?"</li>
+                                    <li>"take me to the smallest peroxisome"</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -151,12 +216,14 @@
                     <div class="analysis-results" id="analysis-results">
                         <div class="placeholder">
                             <p>📊 Request data analysis and visualizations...</p>
-                            <p class="examples">Examples:</p>
-                            <ul>
-                                <li>"Plot the volume distribution of mitochondria"</li>
-                                <li>"Show me a histogram of nucleus sizes"</li>
-                                <li>"Compare mitochondria volume vs surface area"</li>
-                            </ul>
+                            <div class="examples">
+                                <p>Examples:</p>
+                                <ul>
+                                    <li>"Plot the volume distribution of mitochondria"</li>
+                                    <li>"Show me a histogram of nucleus sizes"</li>
+                                    <li>"Compare mitochondria volume vs surface area"</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
                 </div>
