@@ -64,3 +64,7 @@ analysis_results/
 
 # Container images
 containers/
+
+# Node modules (but keep static-site/lib with neuroglancer)
+node_modules/
+!static-site/lib/

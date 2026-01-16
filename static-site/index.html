@@ -6,52 +6,44 @@
     <title>Neuroglancer Tourguide - Static Site</title>
     <link rel="stylesheet" href="style.css">
     
-    <!-- Load Neuroglancer with fallback CDNs -->
+    <!-- Load Neuroglancer from local files -->
+    <link rel="stylesheet" href="lib/main.css">
     <script>
         // Track if Neuroglancer loaded successfully
         window.neuroglancerLoading = new Promise((resolve, reject) => {
-            // Ensure DOM is ready before manipulating scripts
+            // Load neuroglancer main bundle from local lib directory
             function loadNeuroglancer() {
-                // Try primary CDN (unpkg)
-                const script1 = document.createElement('script');
-                script1.src = 'https://unpkg.com/neuroglancer@2.38.0/dist/min/neuroglancer.js';
-                script1.async = false; // Ensure synchronous loading order
+                const script = document.createElement('script');
+                script.src = 'lib/main.bundle.js';
+                script.async = false; // Ensure synchronous loading order
                 
-                script1.onload = function() {
-                    console.log('✅ Neuroglancer loaded from unpkg.com');
-                    resolve();
-                };
-                
-                script1.onerror = function() {
-                    console.warn('⚠️ Failed to load from unpkg.com, trying jsdelivr...');
-                    // Remove failed script from DOM (with fallback for older browsers)
-                    if (script1.parentNode) {
-                        script1.parentNode.removeChild(script1);
-                    }
+                script.onload = function() {
+                    console.log('✅ Neuroglancer bundle loaded from local lib directory');
                     
-                    // Try fallback CDN (jsdelivr)
-                    const script2 = document.createElement('script');
-                    script2.src = 'https://cdn.jsdelivr.net/npm/neuroglancer@2.38.0/dist/min/neuroglancer.js';
-                    script2.async = false;
+                    // Now load the shim that exposes the API
+                    const shimScript = document.createElement('script');
+                    shimScript.src = 'lib/neuroglancer-shim.js';
+                    shimScript.async = false;
                     
-                    script2.onload = function() {
-                        console.log('✅ Neuroglancer loaded from jsdelivr.net');
+                    shimScript.onload = function() {
+                        console.log('✅ Neuroglancer API wrapper loaded');
                         resolve();
                     };
                     
-                    script2.onerror = function() {
-                        console.error('❌ Failed to load Neuroglancer from all CDNs');
-                        // Remove failed script from DOM (with fallback for older browsers)
-                        if (script2.parentNode) {
-                            script2.parentNode.removeChild(script2);
-                        }
-                        reject(new Error('All CDN sources failed'));
+                    shimScript.onerror = function() {
+                        console.error('❌ Failed to load Neuroglancer API wrapper');
+                        reject(new Error('Failed to load neuroglancer wrapper'));
                     };
                     
-                    (document.head || document.getElementsByTagName('head')[0]).appendChild(script2);
+                    (document.head || document.getElementsByTagName('head')[0]).appendChild(shimScript);
                 };
                 
-                (document.head || document.getElementsByTagName('head')[0]).appendChild(script1);
+                script.onerror = function() {
+                    console.error('❌ Failed to load Neuroglancer from local lib directory');
+                    reject(new Error('Failed to load neuroglancer from local files'));
+                };
+                
+                (document.head || document.getElementsByTagName('head')[0]).appendChild(script);
             }
             
             // Execute when DOM is ready
@@ -133,6 +125,7 @@
                     <h2>Neuroglancer Viewer</h2>
                     <div class="viewer-controls">
                         <select id="dataset-selector">
+                            <option value="mus-cortex" selected>Mouse Cortex (jrc_mus-cortex-3)</option>
                             <option value="celegans">C. elegans (Comma Stage)</option>
                             <option value="hela">HeLa Cell</option>
                             <option value="custom">Load from OpenOrganelle...</option>
