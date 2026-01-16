@@ -32,6 +32,17 @@ const CONFIG = {
             },
             initialPosition: [5000, 5000, 2500],
             organelles: ['mito_seg', 'nucleus_seg', 'er_seg']
+        },
+        'mus-cortex': {
+            name: 'Mouse Cortex (jrc_mus-cortex-3)',
+            baseUrl: 's3://janelia-cosem-datasets/jrc_mus-cortex-3/jrc_mus-cortex-3',
+            dimensions: {
+                x: [4e-9, 'm'],
+                y: [4e-9, 'm'],
+                z: [4e-9, 'm']
+            },
+            initialPosition: [10000, 10000, 5000],
+            organelles: ['mito', 'er', 'vesicle', 'np', 'pm']
         }
     },
     security: {
@@ -50,7 +61,7 @@ class NeuroglancerTourguide {
         this.apiConfig = this.loadAPIConfig();
         this.screenshots = [];
         this.narrations = [];
-        this.currentDataset = 'celegans';
+        this.currentDataset = 'mus-cortex';
         
         this.init();
     }
@@ -202,6 +213,8 @@ class NeuroglancerTourguide {
                 state = this.getCelegansState();
             } else if (datasetName === 'hela') {
                 state = this.getHelaState();
+            } else if (datasetName === 'mus-cortex') {
+                state = this.getMusCortexState();
             }
             
             // Set the viewer state
@@ -287,6 +300,59 @@ class NeuroglancerTourguide {
                     type: 'segmentation',
                     source: `n5://${baseUrl}.n5/labels/er_seg`,
                     name: 'er_seg',
+                    visible: false
+                }
+            ],
+            layout: 'xy-3d'
+        };
+    }
+
+    getMusCortexState() {
+        // Mouse Cortex (jrc_mus-cortex-3) EM data from OpenOrganelle
+        const config = CONFIG.datasets['mus-cortex'];
+        const baseUrl = config.baseUrl;
+        
+        return {
+            dimensions: config.dimensions,
+            position: config.initialPosition,
+            crossSectionScale: 20,
+            projectionScale: 80000,
+            layers: [
+                {
+                    type: 'image',
+                    source: `zarr://${baseUrl}.zarr/recon-1/em/fibsem-uint8/`,
+                    name: 'fibsem-uint8',
+                    shader: '#uicontrol invlerp normalized\nvoid main() { emitGrayscale(normalized()); }',
+                    visible: true
+                },
+                {
+                    type: 'segmentation',
+                    source: `zarr://${baseUrl}.zarr/recon-1/labels/mito/`,
+                    name: 'mito',
+                    visible: false
+                },
+                {
+                    type: 'segmentation',
+                    source: `zarr://${baseUrl}.zarr/recon-1/labels/er/`,
+                    name: 'er',
+                    visible: false
+                },
+                {
+                    type: 'segmentation',
+                    source: `zarr://${baseUrl}.zarr/recon-1/labels/vesicle/`,
+                    name: 'vesicle',
+                    visible: false
+                },
+                {
+                    type: 'segmentation',
+                    source: `zarr://${baseUrl}.zarr/recon-1/labels/np/`,
+                    name: 'np',
+                    visible: false
+                },
+                {
+                    type: 'segmentation',
+                    source: `zarr://${baseUrl}.zarr/recon-1/labels/pm/`,
+                    name: 'pm',
                     visible: false
                 }
             ],
