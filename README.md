@@ -83,10 +83,13 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install dependencies
 pip install -r server/requirements.txt
+pip install zarr pandas ollama python-dotenv
 
 # Start the server
 python server/main.py
 ```
+
+> **Note**: If you encounter `ModuleNotFoundError`, ensure all dependencies are installed. See [INSTALL_DEPENDENCIES.md](INSTALL_DEPENDENCIES.md) for troubleshooting.
 
 ### Usage
 
@@ -362,9 +365,14 @@ See [CLUSTER_TROUBLESHOOTING.md](CLUSTER_TROUBLESHOOTING.md) for detailed cluste
 - Python 3.10+
 - FastAPI & Uvicorn
 - Pillow
-- Neuroglancer
+- Neuroglancer (2.40.1)
+- Zarr (for dataset access)
+- Pandas (for data manipulation)
 - FFmpeg (for movie compilation)
 - edge-tts (for voice synthesis, optional)
+- Ollama (for local AI, optional)
+
+**See [INSTALL_DEPENDENCIES.md](INSTALL_DEPENDENCIES.md) for detailed installation instructions.**
 
 ## License
 
